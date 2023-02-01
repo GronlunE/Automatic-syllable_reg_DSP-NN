@@ -1,8 +1,11 @@
 import glob
+import sys
 import taglib
+from os import path
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matlab.engine
 
 from tensorflow import keras
 from keras import layers
@@ -15,9 +18,45 @@ from keras import layers
 """
 
 
-def build_logMel_npz(root = r"resources\audio\**\*.wav"):
+def run_malab_engine(matlab_home = r"C:\Program Files\MATLAB\R2022b"):
+    """
 
-    return
+    :param matlab_home:
+    :return:
+    """
+    sys.path.append(matlab_home)
+    path_1 = r"matlab_logMel"
+
+    eng = matlab.engine.start_matlab()
+    eng.addpath(path_1)
+
+    return eng
+
+
+def build_logMel_npz(root = r"resources\audio\**\*.wav", save_loc = r"resources\logMel.npz"):
+    """
+
+    :param save_loc:
+    :param root:
+    :return:
+    """
+    npz_dict = {}
+    n = 0
+
+    eng = run_malab_engine()
+    for filepath in glob.glob(root, recursive=True):
+
+        file_info = get_file_info(filepath)
+        filename = file_info["filename"]
+
+        logMel = np.array(eng.logMel(filepath)).astype(float)
+        npz_dict[filename] = logMel
+
+        if n % 1000 == 0:
+            print(n, "Done")
+        n = n+1
+
+    np.savez(save_loc, **npz_dict)
 
 
 def get_file_info(filepath):
@@ -45,8 +84,9 @@ def form_dict(root, languages):
     :param root:
     :return:
     """
+    n = 0
     data_dict = {}
-    mel_data = np.load(r"resources\log_mel.npz")
+    mel_data = np.load(r"resources\logMel.npz")
     for file in glob.glob(root, recursive=True):
 
         # Get filename and language
@@ -66,43 +106,53 @@ def form_dict(root, languages):
             # Add to dict
             data_dict[file_name] = [syllables, log_mel]
 
+        if n % 1000 == 0:
+            print(n, "Done")
+        n = n+1
+
     return data_dict
 
 
-def form_tensor(input_data, t=650):
+def form_tensor(input_data, T=650):
     """
 
     :param input_data:
-    :param t:
+    :param T:
     :return:
     """
     # Input data as a list of matrices
     # input_data = [matrix_1, matrix_2, ..., matrix_n]
 
+    n = 0
+
     # Number of samples
-    n = len(input_data)
+    N = len(input_data)
 
     # Feature dimension
-    d = input_data[0].shape[1]
+    D = input_data[0].shape[1]
 
     # Initialize a numpy array with the desired shape
-    output_tensor = np.zeros((n, t, d))
+    output_tensor = np.zeros((N, T, D))
 
     for i, matrix in enumerate(input_data):
 
         # Crop if longer than T frames
-        if matrix.shape[0] > t:
-            matrix = matrix[:t, :]
+        if matrix.shape[0] > T:
+            matrix = matrix[:T, :]
 
         # Pad if shorter than T frames
-        elif matrix.shape[0] < t:
-            padding = np.zeros((t - matrix.shape[0], d))
+        elif matrix.shape[0] < T:
+            padding = np.zeros((T - matrix.shape[0], D))
             matrix = np.concatenate((matrix, padding), axis=0)
 
         # Assign the processed matrix to the output tensor
         output_tensor[i, :, :] = matrix
 
-    return output_tensor, n, t, d
+        if n % 1000 == 0:
+            print(n, "Done")
+        n = n+1
+
+    return output_tensor, N, T, D
 
 
 def plot_model(model):
@@ -130,7 +180,11 @@ def run_RNN(root = r"resources\audio\**\*.wav"):
     :param root:
     :return:
     """
-    print("Loading...")
+    if not path.exists(r"src\resources\logMel.npz"):
+        print("Building logMels...")
+        build_logMel_npz()
+
+    print("Unpacking syllables and logMels...")
     # Form "filename: [syllables, log-Mel]" dict for the existing audio files
     languages = ["french"]
     data_dict = form_dict(root, languages)
@@ -144,6 +198,7 @@ def run_RNN(root = r"resources\audio\**\*.wav"):
     syll_train = np.array(syllables)
 
     # Form Tensor
+    print("Forming tensor...")
     tensor, N, T, D = form_tensor(list_of_log_mels)
 
     print("Tensor dimensions:", [N, T, D])
