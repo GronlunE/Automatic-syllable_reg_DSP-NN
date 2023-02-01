@@ -15,6 +15,29 @@ from keras import layers
 """
 
 
+def build_logMel_npz(root = r"resources\audio\**\*.wav"):
+
+    return
+
+
+def get_file_info(filepath):
+    """
+
+    :param filepath:
+    :return:
+    """
+    file_info = {}
+    split = filepath.split("\\")
+    filename = split[-1]
+    language = split[-2]
+
+    file_info["filepath"] = filepath
+    file_info["filename"] = filename
+    file_info["language"] = language
+
+    return file_info
+
+
 def form_dict(root, languages):
     """
 
@@ -27,7 +50,7 @@ def form_dict(root, languages):
     for file in glob.glob(root, recursive=True):
 
         # Get filename and language
-        file_data = get_file_data(file)
+        file_data = get_file_info(file)
         file_name = file_data["filename"]
         file_language = file_data["language"]
 
