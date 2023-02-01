@@ -106,9 +106,9 @@ def form_dict(root, languages):
             # Add to dict
             data_dict[file_name] = [syllables, log_mel]
 
-        if n % 1000 == 0:
-            print(n, "Done")
-        n = n+1
+            if n % 1000 == 0:
+                print(n, "Done")
+            n = n + 1
 
     return data_dict
 
@@ -180,7 +180,7 @@ def run_RNN(root = r"resources\audio\**\*.wav"):
     :param root:
     :return:
     """
-    if not path.exists(r"src\resources\logMel.npz"):
+    if not path.exists(r"resources\logMel.npz"):
         print("Building logMels...")
         build_logMel_npz()
 
