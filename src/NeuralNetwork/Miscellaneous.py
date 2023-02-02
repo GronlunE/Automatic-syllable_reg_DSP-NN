@@ -21,13 +21,13 @@ def get_audio_durs(wav_root):
     plt.show()
 
 
-def run_matlab_engine(matlab_home):
+def run_matlab_engine(matlabroot):
     """
 
-    :param matlab_home:
+    :param matlabroot:
     :return:
     """
-    sys.path.append(matlab_home)
+    sys.path.append(matlabroot)
     path_1 = r"matlab"
 
     eng = matlab.engine.start_matlab()

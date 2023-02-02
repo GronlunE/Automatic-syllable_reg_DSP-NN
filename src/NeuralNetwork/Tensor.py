@@ -10,14 +10,14 @@ import taglib
 from Miscellaneous import run_matlab_engine, get_file_info
 
 
-def build_logMel_npz(wav_root, matlab_home, npz_loc):
+def build_logMel_npz(wav_root, matlabroot, npz_loc):
     """
 
     :return:
     """
     npz_dict = {}
     n = 0
-    eng = run_matlab_engine(matlab_home=matlab_home)
+    eng = run_matlab_engine(matlabroot=matlabroot)
 
     for filepath in glob.glob(wav_root, recursive=True):
         file_info = get_file_info(filepath)
@@ -107,7 +107,7 @@ def assemble_tensor(wav_logMels, T=650):
     return output_tensor
 
 
-def build_training_data(wav_root, npz_loc, matlab_home, tensordata_loc):
+def build_training_data(wav_root, npz_loc, matlabroot, tensordata_loc):
     """
 
     :return:
@@ -115,7 +115,7 @@ def build_training_data(wav_root, npz_loc, matlab_home, tensordata_loc):
     if not path.exists(tensordata_loc):
         if not path.exists(npz_loc):
             print("Building logMels...")
-            build_logMel_npz(wav_root=wav_root, matlab_home=matlab_home, npz_loc=npz_loc)
+            build_logMel_npz(wav_root=wav_root, matlabroot=matlabroot, npz_loc=npz_loc)
 
         print("Unpacking syllables and logMels...")
         # Form "filename: [syllables, log-Mel]" dict for the existing audio files

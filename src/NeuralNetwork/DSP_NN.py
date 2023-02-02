@@ -154,13 +154,13 @@ def plot_model(model):
     plt.show()
 
 
-def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlab_home, epochs, batch_size):
+def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlabroot, epochs, batch_size):
     """
 
     :param tensordata_loc:
     :param npz_loc:
     :param wav_root:
-    :param matlab_home:
+    :param matlabroot:
     :param wav_root:
     :param epochs:
     :param batch_size:
@@ -169,7 +169,7 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlab_home, epochs, batch_si
 
     # Get tensor and syllables for the audio segments
     tensor, syll_train = build_training_data(wav_root=wav_root,
-                                             matlab_home=matlab_home,
+                                             matlabroot=matlabroot,
                                              npz_loc=npz_loc,
                                              tensordata_loc=tensordata_loc)
 
