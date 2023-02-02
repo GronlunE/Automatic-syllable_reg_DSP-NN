@@ -134,20 +134,20 @@ def plot_model(model):
     epochs = range(1, len(val_loss) + 1)
 
     plt.figure()
-    plt.plot(epochs, loss, 'b', color='g', label='Training loss')
-    plt.plot(epochs, val_loss, 'b', color='r', label='Validation loss')
+    plt.plot(epochs, loss, 'g', label='Training loss')
+    plt.plot(epochs, val_loss, 'r', label='Validation loss')
     plt.title('Training and validation loss')
     plt.legend()
 
     plt.figure()
-    plt.plot(epochs, mean_abs_err, 'b', color='g', label='Training loss')
-    plt.plot(epochs, val_mean_abs_err, 'b', color='r', label='Validation loss')
+    plt.plot(epochs, mean_abs_err, 'g', label='Training loss')
+    plt.plot(epochs, val_mean_abs_err, 'r', label='Validation loss')
     plt.title('MA and validation MA error')
     plt.legend()
 
     plt.figure()
-    plt.plot(epochs, mean_abs_pct_err, 'b', color='g', label='Training loss')
-    plt.plot(epochs, val_mean_abs_pct_err, 'b', color='r', label='Validation loss')
+    plt.plot(epochs, mean_abs_pct_err, 'g', label='Training loss')
+    plt.plot(epochs, val_mean_abs_pct_err, 'r', label='Validation loss')
     plt.title('MA% and validation MA% error')
     plt.legend()
 
