@@ -1,10 +1,12 @@
-from os import path
 import glob
-
 import numpy as np
+from os import path
 from scipy.io import savemat, loadmat
 
+# To open metadata from .wav files
 import taglib
+
+# Own implementation
 from Miscellaneous import run_matlab_engine, get_file_info
 
 

@@ -1,3 +1,4 @@
+# Own implementation
 from DSP_NN import run_WaveNet
 
 wav_root = r"resources\audio\**\*.wav"

@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# from keras.layers import Dense, Dropout, Embedding, LSTM, merging, MaxPooling1D
-# from keras.layers import Flatten, Conv2D, MaxPooling2D, UpSampling2D, Conv1D, UpSampling1D, AveragePooling1D
+# Keras
 from keras.layers import Input, TimeDistributed, Add, Multiply
 from keras.layers import Dense, Dropout, Conv1D, GRU
 from keras.metrics import MeanAbsoluteError, MeanAbsolutePercentageError
 from keras import regularizers
 from keras.models import Model
 
+# Own implementation
 from Tensor import build_training_data
 
 
