@@ -13,7 +13,9 @@ def main():
     run_WaveNet(wav_root=wav_root,
                 npz_loc=npz_loc,
                 tensordata_loc=tensordata_loc,
-                matlab_home=matlab_home)
+                matlab_home=matlab_home,
+                epochs=15,
+                batch_size=32)
 
     return
 

@@ -154,7 +154,7 @@ def plot_model(model):
     plt.show()
 
 
-def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlab_home):
+def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlab_home, epochs, batch_size):
     """
 
     :param tensordata_loc:
@@ -162,6 +162,8 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlab_home):
     :param wav_root:
     :param matlab_home:
     :param wav_root:
+    :param epochs:
+    :param batch_size:
     :return:
     """
 
@@ -193,8 +195,8 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlab_home):
 
     # Train the model
     history = model.fit(tensor, syll_train,
-                        epochs=5,
-                        batch_size=32,
+                        epochs=epochs,
+                        batch_size=batch_size,
                         validation_split=0.2, )
     plot_model(history)
 
