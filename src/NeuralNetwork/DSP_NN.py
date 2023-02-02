@@ -19,13 +19,6 @@ from keras.layers import Dense, Dropout, Conv1D, GRU
 from keras import regularizers
 from keras.models import Model
 
-"""
-[input layer]
-[RNN layer 1] (return-sequences=true),128 dim
-[RNN layer 2]  (return-sequences=false), 128 dim
-[dense layer] 1dim (GELU, ELU or RELU):
-"""
-
 
 def get_audio_durs(root = r"resources\audio\french\*.wav"):
     durs = []
