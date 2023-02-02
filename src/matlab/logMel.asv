@@ -1,0 +1,13 @@
+function [mel] = logMel(filepath)
+[audioIn, fs] = audioread(filepath);
+new_sr = 16000;
+window = round(0.025*new_sr);
+shift = round(0.010*new_sr);
+audioIn = resample(audioIn,fs,new_sr);
+
+mel = melSpectrogram(audioIn,fs, ...
+                   'Window',hamming(round(0.025*new_sr),'periodic'), ...
+                   'OverlapLength',shift, ...
+                   'NumBands',40);
+mel = transpose(mel);
+end
