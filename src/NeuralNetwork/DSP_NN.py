@@ -1,11 +1,16 @@
 import glob
 import sys
+
+from scipy.io import savemat, loadmat
 import taglib
 from os import path
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matlab.engine
+
+# import librosa
+# import chardet
 
 from tensorflow import keras
 from keras import layers
@@ -42,20 +47,29 @@ def build_logMel_npz(root = r"resources\audio\**\*.wav", save_loc = r"resources\
     """
     npz_dict = {}
     n = 0
-
     eng = run_malab_engine()
     for filepath in glob.glob(root, recursive=True):
-
+        # audio, sr = librosa.load(filepath)
+        # new_sr = 16000
+        # audio_resamp = librosa.resample(y=audio, orig_sr=sr, target_sr=new_sr)
         file_info = get_file_info(filepath)
         filename = file_info["filename"]
 
         logMel = np.array(eng.logMel(filepath)).astype(float)
+        """
+        logMel = librosa.feature.melspectrogram(y=audio_resamp,
+                                                sr=new_sr,
+                                                n_mels=40,
+                                                hop_length=int(0.010*new_sr),
+                                                n_fft=int(0.025*new_sr))
+        """
         npz_dict[filename] = logMel
 
         if n % 1000 == 0:
             print(n, "Done")
         n = n+1
 
+    print("All done")
     np.savez(save_loc, **npz_dict)
 
 
@@ -110,18 +124,25 @@ def form_dict(root, languages):
                 print(n, "Done")
             n = n + 1
 
+    print("All done")
     return data_dict
 
 
-def form_tensor(input_data, T=650):
+def form_tensor(input_data, T=450):
     """
 
     :param input_data:
     :param T:
     :return:
     """
+
     # Input data as a list of matrices
     # input_data = [matrix_1, matrix_2, ..., matrix_n]
+    list_of_N = []
+    for matrix in input_data:
+        list_of_N.append(np.shape(matrix)[0])
+    plt.hist(list_of_N)
+    plt.show()
 
     n = 0
 
@@ -152,6 +173,7 @@ def form_tensor(input_data, T=650):
             print(n, "Done")
         n = n+1
 
+    print("All done")
     return output_tensor, N, T, D
 
 
@@ -180,32 +202,39 @@ def run_RNN(root = r"resources\audio\**\*.wav"):
     :param root:
     :return:
     """
-    if not path.exists(r"resources\logMel.npz"):
-        print("Building logMels...")
-        build_logMel_npz()
+    if not path.exists(r"resources\tensordata.mat"):
+        if not path.exists(r"resources\logMel.npz"):
+            print("Building logMels...")
+            build_logMel_npz()
 
-    print("Unpacking syllables and logMels...")
-    # Form "filename: [syllables, log-Mel]" dict for the existing audio files
-    languages = ["french"]
-    data_dict = form_dict(root, languages)
-    list_of_log_mels = []
-    syllables = []
+        print("Unpacking syllables and logMels...")
+        # Form "filename: [syllables, log-Mel]" dict for the existing audio files
+        languages = ["french"]
+        data_dict = form_dict(root, languages)
+        list_of_log_mels = []
+        syllables = []
 
-    # Divide the dict into lists of log-Mel values and syllable values index-wise
-    for key in data_dict.keys():
-        syllables.append(data_dict[key][0])
-        list_of_log_mels.append(data_dict[key][1])
-    syll_train = np.array(syllables)
+        # Divide the dict into lists of log-Mel values and syllable values index-wise
+        for key in data_dict.keys():
+            syllables.append(data_dict[key][0])
+            list_of_log_mels.append(data_dict[key][1])
+        syll_train = np.array(syllables)
 
-    # Form Tensor
-    print("Forming tensor...")
-    tensor, N, T, D = form_tensor(list_of_log_mels)
+        # Form Tensor
+        print("Forming tensor...")
+        tensor, N, T, D = form_tensor(list_of_log_mels)
 
-    print("Tensor dimensions:", [N, T, D])
+        savemat(r"resources\tensordata.mat", {"tensor": tensor, "syll_train": syll_train})
+    else:
+        mat_data = loadmat(r"resources\tensordata.mat")
+        tensor = mat_data["tensor"]
+        syll_train = np.transpose(mat_data["syll_train"])
+
+    print("Tensor dimensions:", np.shape(tensor))
     print("Syllable dimensions:", np.shape(syll_train))
 
     # Input Layer
-    inputs = keras.Input(shape=(None, D))
+    inputs = keras.Input(shape=(None, 40))
 
     # GRU Layer 1
     gru_1 = layers.GRU(128, return_sequences=True)(inputs)
@@ -226,9 +255,8 @@ def run_RNN(root = r"resources\audio\**\*.wav"):
     history = model.fit(tensor, syll_train,
                         epochs=10,
                         batch_size=32,
-                        validation_split=0.2,
-                        callbacks=[keras.callbacks.LearningRateScheduler(lambda epoch: 1e-3 * 10 ** (epoch/30))])
-
+                        validation_split=0.2)
+    #  callbacks=[keras.callbacks.LearningRateScheduler(lambda epoch: 1e-3 * 10 ** (epoch/30))]
     plot_model(history)
 
 
