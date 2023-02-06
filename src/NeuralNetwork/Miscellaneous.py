@@ -3,6 +3,8 @@ import sys
 import matplotlib.pyplot as plt
 from librosa import get_duration
 import numpy as np
+import taglib
+import pandas as pd
 
 # Matlab
 import matlab.engine
@@ -84,3 +86,35 @@ def get_file_info(filepath):
     file_info["language"] = language
 
     return file_info
+
+
+def write_csv(npz_loc):
+    language_dirs = glob.glob(r"resources\audio\*", recursive=True)
+
+    npz_data = np.load(npz_loc)
+    for filepath in language_dirs:
+        csv_dict = {"Filename": [], "Audio duration": [], "LogMel shape": [], "Syllables": []}
+        language = filepath.split("\\")[-1]
+        syllables = []
+        filenames = []
+        durations = []
+        LM_shapes = []
+        directory = filepath + "\\*.wav*"
+        for file in glob.glob(directory, recursive=True):
+            filename = file.split("\\")[-1]
+            syll = int(taglib.File(file).tags["SYLLABLE_COUNT"][0])
+            t = round(get_duration(filename=file), 2)
+            LM_shape = np.shape(npz_data[filename])[0]
+
+            filenames.append(filename.removesuffix(".wav"))
+            LM_shapes.append(LM_shape)
+            durations.append(t)
+            syllables.append(syll)
+
+            csv_dict["Filename"] = filenames
+            csv_dict["Audio duration"] = durations
+            csv_dict["Syllables"] = syllables
+            csv_dict["LogMel shape"] = LM_shapes
+
+            csv_df = pd.DataFrame(csv_dict)
+            csv_df.to_csv(filepath + "\\" + language + ".csv", index=False)
