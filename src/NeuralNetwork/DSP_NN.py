@@ -1,5 +1,8 @@
+import keras.callbacks
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.io import loadmat
+import glob
 
 # Keras
 from keras.layers import Input, TimeDistributed, Add, Multiply
@@ -7,9 +10,13 @@ from keras.layers import Dense, Dropout, Conv1D, GRU
 from keras.metrics import MeanAbsoluteError, MeanAbsolutePercentageError
 from keras import regularizers
 from keras.models import Model
+import keras.losses
+
+# sklearn
+from sklearn.metrics import accuracy_score
 
 # Own implementation
-from Tensor import build_training_data
+from Tensor import build_data
 
 
 def wavenet_model(X_in, n_channels):
@@ -154,9 +161,47 @@ def plot_model(model):
     plt.show()
 
 
-def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlabroot, epochs, batch_size):
+def run_prediciton(model, test_tensordata_loc):
     """
 
+    :param model:
+    :param test_tensordata_loc:
+    :return:
+    """
+    mat_data = loadmat(test_tensordata_loc)
+    languages = ["english", "estonian"]
+    for language in languages:
+
+        print("Loading testing data...", "\n")
+
+        test_tensor = mat_data[language + "_test_" + "tensor"]
+        test_syll = np.transpose(mat_data[language + "_test_" + "syllables"]).flatten()
+
+        print("Testing language:", language, "\n")
+        print("Tensor dimensions:", np.shape(np.array(test_tensor)))
+        print("Syllable dimensions:", np.shape(np.array(test_syll)), "\n")
+
+        syl_estimates = model.predict(test_tensor).flatten()
+
+        print("Estimated syllable dimensions:", np.shape(syl_estimates))
+
+        MAE = keras.losses.MeanAbsoluteError()
+        MAPE = keras.losses.MeanAbsolutePercentageError()
+
+        print(np.transpose(np.array(test_syll).transpose()).tolist())
+        print(np.transpose(np.array(syl_estimates)).tolist())
+
+        mean_abs_err = MAE(test_syll, np.array(syl_estimates).transpose()).numpy()
+        mean_abs_pct_err = MAPE(test_syll, syl_estimates).numpy()
+
+        print("\n" + "MeanAbsoluteError:", mean_abs_err)
+        print("MeanAbsolutePercentageError:", mean_abs_pct_err)
+
+
+def run_WaveNet(wav_root, npz_loc, tensordata_loc, test_tensordata_loc, matlabroot, epochs, batch_size):
+    """
+
+    :param test_tensordata_loc:
     :param tensordata_loc:
     :param npz_loc:
     :param wav_root:
@@ -168,10 +213,10 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlabroot, epochs, batch_siz
     """
 
     # Get tensor and syllables for the audio segments
-    tensor, syll_train = build_training_data(wav_root=wav_root,
-                                             matlabroot=matlabroot,
-                                             npz_loc=npz_loc,
-                                             tensordata_loc=tensordata_loc)
+    tensor, syll_train = build_data(wav_root=wav_root,
+                                    matlabroot=matlabroot,
+                                    npz_loc=npz_loc,
+                                    tensordata_loc=tensordata_loc)
 
     print("Tensor dimensions:", np.shape(tensor))
     print("Syllable dimensions:", np.shape(syll_train))
@@ -184,10 +229,10 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlabroot, epochs, batch_siz
     ord_ = np.arange(N)
     np.random.shuffle(ord_)
     tensor = tensor[ord_, :, :]
-    syll_train = syll_train[ord_]
+    syll_train = np.array(syll_train[ord_])
 
     # Get model
-    model = wavenet_model(tensor, 64)
+    model = wavenet_model(tensor, 128)
 
     # Compile the model
     model.compile(optimizer='adam', loss='mean_absolute_percentage_error',
@@ -197,7 +242,11 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlabroot, epochs, batch_siz
     history = model.fit(tensor, syll_train,
                         epochs=epochs,
                         batch_size=batch_size,
-                        validation_split=0.2, )
-    plot_model(history)
+                        validation_split=0.2,
+                        callbacks=[keras.callbacks.LearningRateScheduler(lambda epoch: 1e-4 * 10 ** (epoch/30))])
+
+    # plot_model(history)
+
+    run_prediciton(model, test_tensordata_loc)
 
     return

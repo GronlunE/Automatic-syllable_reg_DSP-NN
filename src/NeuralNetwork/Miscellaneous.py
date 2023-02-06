@@ -1,24 +1,56 @@
 import glob
-import wave
-import contextlib
 import sys
-import matplotlib as plt
+import matplotlib.pyplot as plt
+from librosa import get_duration
+import numpy as np
 
 # Matlab
 import matlab.engine
 
 
-def get_audio_durs(wav_root):
-    durs = []
-    for filepath in glob.glob(wav_root, recursive=True):
-        with contextlib.closing(wave.open(filepath, 'r')) as f:
-            frames = f.getnframes()
-            rate = f.getframerate()
-            duration = frames / float(rate)
-            durs.append(duration)
+def get_logMel_shapes(npz_loc):
+    """
 
-    plt.hist(durs)
+    :param npz_loc:
+    :return:
+    """
+    mel_data = np.load(npz_loc)
+    list_of_mel_shape = []
+    n = 0
+    for name in mel_data:
+        array = mel_data[name]
+        list_of_mel_shape.append(np.shape(array)[0])
+        if n % 1000 == 0:
+            print(n, "Done")
+        n = n + 1
+    print("All Done")
+    return list_of_mel_shape
+
+
+def get_audio_durs(wav_root):
+    """
+
+    :param wav_root:
+    :return:
+    """
+    durs = []
+    n = 0
+    for filepath in glob.glob(wav_root, recursive=True):
+        t = get_duration(filename=filepath)
+        durs.append(t)
+        if n % 1000 == 0:
+            print(n, "Done")
+        n = n + 1
+    print("All Done")
+    return durs
+
+
+def compare_dur_and_logMel_shape(logMels, durations):
+    plt.hist(logMels)
+    plt.figure()
+    plt.hist(durations)
     plt.show()
+    return
 
 
 def run_matlab_engine(matlabroot):
