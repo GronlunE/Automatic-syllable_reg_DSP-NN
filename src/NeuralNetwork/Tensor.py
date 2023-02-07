@@ -115,8 +115,8 @@ def build_data(wav_root, npz_loc, matlabroot, tensordata_loc):
 
     :return:
     """
-    if path.exists(tensordata_loc):
-        if path.exists(npz_loc):
+    if not path.exists(tensordata_loc):
+        if not path.exists(npz_loc):
             print("Building logMels...")
             build_logMel_npz(wav_root=wav_root, matlabroot=matlabroot, npz_loc=npz_loc)
 

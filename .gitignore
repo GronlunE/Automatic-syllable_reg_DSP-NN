@@ -40,3 +40,4 @@ Thumbs.db
 *.npz
 *.mat
 *.wav
+*.csv

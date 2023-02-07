@@ -20,7 +20,7 @@ def main():
                 tensordata_loc=tensordata_loc,
                 test_tensordata_loc= test_tensordata_loc,
                 matlabroot=matlabroot,
-                epochs=1,
+                epochs=10,
                 batch_size=32)
     return
 

@@ -242,9 +242,9 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, test_tensordata_loc, matlabro
     history = model.fit(tensor, syll_train,
                         epochs=epochs,
                         batch_size=batch_size,
-                        validation_split=0.2,
-                        callbacks=[keras.callbacks.LearningRateScheduler(lambda epoch: 1e-4 * 10 ** (epoch/30))])
+                        validation_split=0.2)
 
+    # callbacks=[keras.callbacks.LearningRateScheduler(lambda epoch: 1e-4 * 10 ** (epoch/30))]
     # plot_model(history)
 
     run_prediciton(model, test_tensordata_loc)
