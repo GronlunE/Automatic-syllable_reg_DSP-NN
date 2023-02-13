@@ -1,22 +1,70 @@
 import keras.callbacks
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy import Inf
 from scipy.io import loadmat
-import glob
+
 
 # Keras
+import tensorflow as tf
+from keras import layers
 from keras.layers import Input, TimeDistributed, Add, Multiply
-from keras.layers import Dense, Dropout, Conv1D, GRU
+from keras.layers import Dense, Dropout, Conv1D
 from keras.metrics import MeanAbsoluteError, MeanAbsolutePercentageError
 from keras import regularizers
 from keras.models import Model
 import keras.losses
 
-# sklearn
-from sklearn.metrics import accuracy_score
-
 # Own implementation
 from Tensor import build_data
+
+
+eps = 2.220446049250313e-16
+
+
+def causal_attention_mask(batch_size, n_dest, n_src, dtype):
+
+    """
+
+    Mask the upper half of the dot product matrix in self attention.
+    This prevents flow of information from future tokens to current token.
+    1's in the lower triangle, counting from the lower right corner.
+    """
+    i = tf.range(n_dest)[:, None]
+    j = tf.range(n_src)
+    m = i >= j - n_src + n_dest
+    mask = tf.cast(m, dtype)
+    mask = tf.reshape(mask, [1, n_dest, n_src])
+    mult = tf.concat(
+        [tf.expand_dims(batch_size, -1), tf.constant([1, 1], dtype=tf.int32)], 0
+    )
+    return tf.tile(mask, mult)
+
+
+class TransformerBlock(layers.Layer):
+
+    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1):
+        super(TransformerBlock, self).__init__()
+        self.att = layers.MultiHeadAttention(num_heads, embed_dim)
+        self.ffn = keras.Sequential(
+            [layers.Dense(ff_dim, activation="relu"), layers.Dense(embed_dim)]
+        )
+        self.layernorm1 = layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm2 = layers.LayerNormalization(epsilon=1e-6)
+        self.dropout1 = layers.Dropout(rate)
+        self.dropout2 = layers.Dropout(rate)
+
+    def call(self, inputs, *args, **kwargs):
+        input_shape = tf.shape(inputs)
+        batch_size = input_shape[0]
+        seq_len = input_shape[1]
+        causal_mask = causal_attention_mask(batch_size, seq_len, seq_len, tf.bool)
+        attention_output = self.att(inputs, inputs, attention_mask=causal_mask)
+        attention_output = self.dropout1(attention_output)
+        out1 = self.layernorm1(inputs + attention_output)
+        ffn_output = self.ffn(out1)
+        ffn_output = self.dropout2(ffn_output)
+        return self.layernorm2(out1 + ffn_output)
 
 
 def wavenet_model(X_in, n_channels):
@@ -116,11 +164,14 @@ def wavenet_model(X_in, n_channels):
     convstack_out = summer([convstack_out, post_scaler5(l5_skip)])
 
     # Future predictions from current observations
-    integrator = GRU(n_channels, return_sequences=False)(convstack_out)
-    mapper = Dense(1, activation='relu')(integrator)
-    model_ = Model(inputs=sequence1, outputs=mapper)
+    integrator = TransformerBlock(n_channels, 8, n_channels)(convstack_out)
+    integrator2 = Conv1D(1, X_in.shape[1])(integrator)
+    mapper = Dense(1, activation='relu')(integrator2)
+    model = Model(inputs=sequence1, outputs=mapper)
 
-    return model_
+    #
+
+    return model
 
 
 def plot_model(model):
@@ -161,47 +212,45 @@ def plot_model(model):
     plt.show()
 
 
-def run_prediciton(model, test_tensordata_loc):
+def run_prediciton(model, test_tensordata_loc, batch_size):
     """
 
+    :param batch_size:
     :param model:
     :param test_tensordata_loc:
     :return:
     """
     mat_data = loadmat(test_tensordata_loc)
-    languages = ["english", "estonian"]
-    for language in languages:
 
-        print("Loading testing data...", "\n")
+    print("\nLoading testing data...", "\n")
 
-        test_tensor = mat_data[language + "_test_" + "tensor"]
-        test_syll = np.transpose(mat_data[language + "_test_" + "syllables"]).flatten()
+    test_tensor = mat_data["tensor"]
+    test_syll = np.transpose(mat_data["syllables"])
 
-        print("Testing language:", language, "\n")
-        print("Tensor dimensions:", np.shape(np.array(test_tensor)))
-        print("Syllable dimensions:", np.shape(np.array(test_syll)), "\n")
+    test_syll[test_syll == 0] = 1
+    test_tensor[test_tensor == -np.inf] = 20*np.log10(eps)
 
-        syl_estimates = model.predict(test_tensor).flatten()
+    print("Tensor dimensions:", np.shape(np.array(test_tensor)))
+    print("Syllable dimensions:", np.shape(np.array(test_syll)), "\n")
 
-        print("Estimated syllable dimensions:", np.shape(syl_estimates))
+    syl_estimates = model.predict(test_tensor, batch_size=batch_size, verbose=2)
 
-        MAE = keras.losses.MeanAbsoluteError()
-        MAPE = keras.losses.MeanAbsolutePercentageError()
+    print("Estimated syllable dimensions:", np.shape(syl_estimates))
 
-        print(np.transpose(np.array(test_syll).transpose()).tolist())
-        print(np.transpose(np.array(syl_estimates)).tolist())
+    MAE = keras.losses.MeanAbsoluteError()
+    MAPE = keras.losses.MeanAbsolutePercentageError()
 
-        mean_abs_err = MAE(test_syll, np.array(syl_estimates).transpose()).numpy()
-        mean_abs_pct_err = MAPE(test_syll, syl_estimates).numpy()
+    mean_abs_err = MAE(test_syll, np.array(syl_estimates).transpose()).numpy()
+    mean_abs_pct_err = MAPE(test_syll, syl_estimates).numpy()
 
-        print("\n" + "MeanAbsoluteError:", mean_abs_err)
-        print("MeanAbsolutePercentageError:", mean_abs_pct_err)
+    print("\n" + "MeanAbsoluteError:", mean_abs_err)
+    print("MeanAbsolutePercentageError:", mean_abs_pct_err)
 
 
-def run_WaveNet(wav_root, npz_loc, tensordata_loc, test_tensordata_loc, matlabroot, epochs, batch_size):
+def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlabroot, epochs, batch_size, dims):
     """
 
-    :param test_tensordata_loc:
+    :param dims:
     :param tensordata_loc:
     :param npz_loc:
     :param wav_root:
@@ -212,12 +261,29 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, test_tensordata_loc, matlabro
     :return:
     """
 
-    # Get tensor and syllables for the audio segments
-    tensor, syll_train = build_data(wav_root=wav_root,
-                                    matlabroot=matlabroot,
-                                    npz_loc=npz_loc,
-                                    tensordata_loc=tensordata_loc)
+    tensors = []
+    syll_trains = []
 
+    # Get tensor and syllables for the audio segments
+    if type(tensordata_loc) == list:
+        for k in range(len(tensordata_loc)):
+            tensor, syll_train = build_data(wav_root=wav_root[k],
+                                            matlabroot=matlabroot,
+                                            npz_loc=npz_loc[k],
+                                            tensordata_loc=tensordata_loc[k])
+            tensors.append(tensor)
+            syll_trains.append(syll_train)
+
+        tensor = np.concatenate(tensors, axis=0)
+        syll_train = np.concatenate(syll_trains, axis=0)
+
+    else:
+        tensor, syll_train = build_data(wav_root=wav_root,
+                                        matlabroot=matlabroot,
+                                        npz_loc=npz_loc,
+                                        tensordata_loc=tensordata_loc)
+
+    tensor[tensor == -np.inf] = 20*np.log10(eps)
     print("Tensor dimensions:", np.shape(tensor))
     print("Syllable dimensions:", np.shape(syll_train))
 
@@ -229,24 +295,35 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, test_tensordata_loc, matlabro
     ord_ = np.arange(N)
     np.random.shuffle(ord_)
     tensor = tensor[ord_, :, :]
-    syll_train = np.array(syll_train[ord_])
+    syll_train = syll_train[ord_]
 
-    # Get model
-    model = wavenet_model(tensor, 128)
+    # strategy = tf.distribute.Strategy()
+    # print("Number of devices: {}".format(strategy.num_replicas_in_sync))
 
+    model = wavenet_model(tensor, dims)
     # Compile the model
     model.compile(optimizer='adam', loss='mean_absolute_percentage_error',
                   metrics=[MeanAbsoluteError(), MeanAbsolutePercentageError()])
+    # model_c.compile(optimizer='adam', loss='mean_absolute_percentage_error',
+    #                metrics=[MeanAbsoluteError(), MeanAbsolutePercentageError()])
+
+    earlystop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
+
+    model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=r"resources/wavenet_model.h5",
+        monitor='val_loss',
+        mode='min',
+        save_best_only=True,
+        )
 
     # Train the model
     history = model.fit(tensor, syll_train,
                         epochs=epochs,
                         batch_size=batch_size,
-                        validation_split=0.2)
+                        callbacks=[earlystop, model_checkpoint_callback],
+                        validation_split=0.2, verbose=2)
 
     # callbacks=[keras.callbacks.LearningRateScheduler(lambda epoch: 1e-4 * 10 ** (epoch/30))]
     # plot_model(history)
 
-    run_prediciton(model, test_tensordata_loc)
-
-    return
+    return model

@@ -4,13 +4,12 @@ from os import path
 from scipy.io import savemat, loadmat
 import scipy.io as spio
 from librosa import get_duration
-import pandas as pd
 
 # To open metadata from .wav files
 import taglib
 
 # Own implementation
-from Miscellaneous import run_matlab_engine, get_file_info, get_logMel_shapes
+from Miscellaneous import run_matlab_engine, get_file_info
 
 
 def build_logMel_npz(wav_root, matlabroot, npz_loc):
@@ -120,7 +119,7 @@ def build_data(wav_root, npz_loc, matlabroot, tensordata_loc):
             print("Building logMels...")
             build_logMel_npz(wav_root=wav_root, matlabroot=matlabroot, npz_loc=npz_loc)
 
-        print("Unpacking syllables and logMels...")
+        print("Unpacking syllables and logMels...\n")
         # Form "filename: [syllables, log-Mel]" dict for the existing audio files
         data_dict = form_dict(wav_root=wav_root, npz_loc=npz_loc)
 
@@ -134,24 +133,24 @@ def build_data(wav_root, npz_loc, matlabroot, tensordata_loc):
         syll_train = np.array(syllables)
 
         # Form Tensor
-        print("Forming tensor...")
+        print("Forming tensor...\n")
         tensor = assemble_tensor(list_of_log_mels)
 
-        savemat(tensordata_loc, {"tensor": tensor, "syll_train": syll_train})
+        savemat(tensordata_loc, {"tensor": tensor, "syllables": syll_train})
 
     else:
-        print("Loading tensor and syllable data from memory...")
+        print("Loading tensor and syllable data from memory...\n")
         mat_data = loadmat(tensordata_loc)
         tensor = mat_data["tensor"]
-        syll_train = np.transpose(mat_data["syll_train"])
+        syll_train = np.transpose(mat_data["syllables"])
 
     return tensor, syll_train
 
 
-def import_test_mat(wav_root, npz_loc, matlabroot, tensordata_loc):
+def import_test_mat(wav_root, npz_loc, tensordata_loc, language):
 
-    mat_loc = r"C:\Users\Elmeri\PycharmProjects\Automatic-syllable_reg_DSP-NN\src\resources\test_audio\english\SKK_anno.mat"
-    mat2_loc = r"C:\Users\Elmeri\PycharmProjects\Automatic-syllable_reg_DSP-NN\src\resources\test_audio\estonian\SWB_anno.mat"
+    mat_loc = r"resources\test_audio\english\SWB_anno.mat"
+    mat2_loc = r"resources\test_audio\estonian\SKK_anno.mat"
 
     def loadmat(filename):
         '''
@@ -197,72 +196,54 @@ def import_test_mat(wav_root, npz_loc, matlabroot, tensordata_loc):
     s = syllables
 
     n = 0
-    eng = run_matlab_engine(matlabroot=matlabroot)
 
     filename_list = []
+    mel_data = np.load(npz_loc)
+
     for filepath in glob.glob(wav_root, recursive=True):
         file = filepath.split("\\")[-1]
         filename_list.append(file)
 
-    language_dirs = glob.glob(r"resources\test_audio\*", recursive=True)
-
     test_tensor_dict = {}
 
-    for language in language_dirs:
+    test_syllables = []
+    list_of_log_mels = []
+    list_of_durs = []
+    current_files = []
+    y = []
 
-        language_name = language.split("\\")[-1]
-        csv_dict = {"Filename": [], "Audio duration": [], "LogMel shape": [], "Syllables": []}
-        npz_dict = {}
-        list_of_log_mels = []
-        test_syllables = []
-        list_of_durs = []
-        current_files = []
-        y = []
+    if language == "english":
+        y = filenames
+        s = syllables
+    elif language == "estonian":
+        y = filenames_2
+        s = syllables_2
 
-        if language_name == "english":
-            y = filenames
-            s = syllables
-        elif language_name == "estonian":
-            y = filenames_2
-            s = syllables_2
-        for filename in y:
-            file = filename.split("/")[-1]
-            wav = r"resources\test_audio"+"\\" + language_name + "\\" + file
-            if file in filename_list:
-                current_files.append(file.removesuffix(".wav"))
-                sylls = len(list(s[y.index(filename)]))
-                test_syllables.append(sylls)
-                t = round(get_duration(filename = wav), 2)
-                logMel = np.array(eng.logMel(wav)).astype(float)
-                npz_dict[file] = logMel
-                list_of_log_mels.append(logMel)
-                list_of_durs.append(t)
+    for filename in y:
 
-                if n % 1000 == 0:
-                    print(n, "Done")
-                n = n+1
+        file = filename.split("/")[-1]
+        wav = r"resources\test_audio" + "\\" + language + "\\" + file
 
-        csv_dict["Filename"] = current_files
-        csv_dict["Audio duration"] = list_of_durs
-        csv_dict["Syllables"] = test_syllables
+        if file in filename_list:
 
-        np.savez(npz_loc, **npz_dict)
-        csv_dict["LogMel shape"] = get_logMel_shapes(npz_loc)
+            current_files.append(file.removesuffix(".wav"))
+            sylls = len(list(s[y.index(filename)]))
+            test_syllables.append(sylls)
+            t = round(get_duration(filename = wav), 2)
+            list_of_durs.append(t)
+            list_of_log_mels.append(mel_data[file])
 
-        print(len(current_files), "items")
-        print(len(list_of_durs), "items")
-        print(len(test_syllables), "items")
-        print(len(get_logMel_shapes(npz_loc)), "items")
-        csv_df = pd.DataFrame(csv_dict)
-        csv_df.to_csv(language + "\\" + "test_" + language_name + ".csv")
+            if n % 1000 == 0:
+                print(n, "Done")
+            n = n+1
 
-        print(language_name)
-        tensor = assemble_tensor(list_of_log_mels)
-        test_tensor_dict[language_name+"_test_"+"tensor"] = tensor
-        test_tensor_dict[language_name+"_test_"+"syllables"] = np.array(test_syllables)
+    tensor = assemble_tensor(list_of_log_mels)
 
-        print("test tensor shape is:", np.shape(np.array(tensor)))
-        print("test syllables shape is:", np.shape(np.array(test_syllables)))
+    test_tensor_dict["tensor"] = tensor
+    test_tensor_dict["syllables"] = np.array(test_syllables)
+
+    print("test tensor shape is:", np.shape(np.array(tensor)))
+    print("test syllables shape is:", np.shape(np.array(test_syllables)))
 
     savemat(tensordata_loc, test_tensor_dict)
     print("All done")

@@ -41,3 +41,8 @@ Thumbs.db
 *.mat
 *.wav
 *.csv
+
+# Directory
+
+/matlab/gammatone/
+/matlab/thetaOsc/

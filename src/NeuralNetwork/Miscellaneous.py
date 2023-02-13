@@ -63,9 +63,11 @@ def run_matlab_engine(matlabroot):
     """
     sys.path.append(matlabroot)
     path_1 = r"matlab"
+    path_2 = r"matlab\gammatone"
+    path_3 = r"matlab\thetaOsc"
 
     eng = matlab.engine.start_matlab()
-    eng.addpath(path_1)
+    eng.addpath(path_1, path_2, path_3)
 
     return eng
 
@@ -111,10 +113,24 @@ def write_csv(npz_loc):
             durations.append(t)
             syllables.append(syll)
 
-            csv_dict["Filename"] = filenames
-            csv_dict["Audio duration"] = durations
-            csv_dict["Syllables"] = syllables
-            csv_dict["LogMel shape"] = LM_shapes
+        csv_dict["Filename"] = filenames
+        csv_dict["Audio duration"] = durations
+        csv_dict["Syllables"] = syllables
+        csv_dict["LogMel shape"] = LM_shapes
 
-            csv_df = pd.DataFrame(csv_dict)
-            csv_df.to_csv(filepath + "\\" + language + ".csv", index=False)
+        csv_df = pd.DataFrame(csv_dict)
+        csv_df.to_csv(filepath + "\\" + language + ".csv", index=False)
+
+
+def get_filepaths(root):
+    """
+
+    :param root:
+    :return:
+    """
+    filepaths = []
+
+    for filepath in glob.glob(root, recursive=True):
+        filepaths.append(filepath)
+
+    return filepaths
