@@ -44,5 +44,5 @@ Thumbs.db
 
 # Directory
 
-/matlab/gammatone/
-/matlab/thetaOsc/
+src/matlab/gammatone/
+src/matlab/thetaOsc/
