@@ -5,6 +5,7 @@ from librosa import get_duration
 import numpy as np
 import taglib
 import pandas as pd
+from scipy.io import loadmat
 
 # Matlab
 import matlab.engine
@@ -90,10 +91,13 @@ def get_file_info(filepath):
     return file_info
 
 
-def write_csv(npz_loc):
-    language_dirs = glob.glob(r"resources\audio\*", recursive=True)
+def write_csv(npz_loc, tensordata_loc):
+    language_dirs = [r"resources\test_audio\english"]
 
     npz_data = np.load(npz_loc)
+    sylls = loadmat(tensordata_loc)["syllables"].flatten()
+    print(sylls)
+    n = 0
     for filepath in language_dirs:
         csv_dict = {"Filename": [], "Audio duration": [], "LogMel shape": [], "Syllables": []}
         language = filepath.split("\\")[-1]
@@ -104,7 +108,8 @@ def write_csv(npz_loc):
         directory = filepath + "\\*.wav*"
         for file in glob.glob(directory, recursive=True):
             filename = file.split("\\")[-1]
-            syll = int(taglib.File(file).tags["SYLLABLE_COUNT"][0])
+            # syll = int(taglib.File(file).tags["SYLLABLE_COUNT"][0])
+            syll = sylls[n]
             t = round(get_duration(filename=file), 2)
             LM_shape = np.shape(npz_data[filename])[0]
 
@@ -112,6 +117,7 @@ def write_csv(npz_loc):
             LM_shapes.append(LM_shape)
             durations.append(t)
             syllables.append(syll)
+            n = n + 1
 
         csv_dict["Filename"] = filenames
         csv_dict["Audio duration"] = durations

@@ -1,9 +1,0 @@
-f
-
-[y, Fs, nbits] = wavread(filename) %load the wav
-[m d] = wavfinfo(filename) %get the wav information
-
-siz = wavread(filename,'size') %siz = [samples channels]
-siz(1)/Fs %should give you the length in seconds
-
-mel = logMel("C:\Users\Elmeri\PycharmProjects\Automatic-syllable_reg_DSP-NN\src\resources\audio\french\french_0.wav");

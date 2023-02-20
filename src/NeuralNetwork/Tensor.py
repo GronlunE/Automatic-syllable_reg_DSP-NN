@@ -4,6 +4,7 @@ from os import path
 from scipy.io import savemat, loadmat
 import scipy.io as spio
 from librosa import get_duration
+import pandas as pd
 
 # To open metadata from .wav files
 import taglib
@@ -239,8 +240,11 @@ def import_test_mat(wav_root, npz_loc, tensordata_loc, language):
 
     tensor = assemble_tensor(list_of_log_mels)
 
+    thetaSylls = pd.read_csv(r"resources\csv" + "\\" + language + ".csv")["Syllables"].tolist()
+
     test_tensor_dict["tensor"] = tensor
-    test_tensor_dict["syllables"] = np.array(test_syllables)
+    test_tensor_dict["syllables"] = np.array(thetaSylls)
+    test_tensor_dict["true_syllables"] = np.array(test_syllables)
 
     print("test tensor shape is:", np.shape(np.array(tensor)))
     print("test syllables shape is:", np.shape(np.array(test_syllables)))

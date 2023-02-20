@@ -212,9 +212,10 @@ def plot_model(model):
     plt.show()
 
 
-def run_prediciton(model, test_tensordata_loc, batch_size):
+def run_prediciton(model, test_tensordata_loc, batch_size, language):
     """
 
+    :param language:
     :param batch_size:
     :param model:
     :param test_tensordata_loc:
@@ -225,7 +226,12 @@ def run_prediciton(model, test_tensordata_loc, batch_size):
     print("\nLoading testing data...", "\n")
 
     test_tensor = mat_data["tensor"]
-    test_syll = np.transpose(mat_data["syllables"])
+    if language == "english" or language == "estonian":
+        print("Testing against true values")
+        test_syll = np.transpose(mat_data["true_syllables"])
+    else:
+        print("Testing against thetaseg values")
+        test_syll = np.transpose(mat_data["syllables"])
 
     test_syll[test_syll == 0] = 1
     test_tensor[test_tensor == -np.inf] = 20*np.log10(eps)

@@ -1,5 +1,6 @@
 # Own implementation
 import numpy as np
+import pandas as pd
 import sys
 
 from DSP_NN import run_WaveNet, run_prediciton
@@ -27,7 +28,7 @@ test_csv_loc = r"C:\Users\Elmeri\PycharmProjects\Automatic-syllable_reg_DSP-NN\s
 def main():
 
     orig_stdout = sys.stdout
-    f = open(r"resources\log.txt", 'w')
+    f = open(r"resources\log_test.txt", 'w')
     sys.stdout = f
 
     """
@@ -38,22 +39,11 @@ def main():
     print("Mean Absolute Error:", MAE)
     print("Mean Absolute Percentage Error:", MAPE)
     """
+
     """
     # Execute WaveNet
-    model = run_WaveNet(wav_root=wav_root,
-                        npz_loc=npz_loc,
-                        tensordata_loc= [tensordata_loc],
-                        matlabroot=matlabroot,
-                        epochs=1,
-                        batch_size=16,
-                        dims=32)
-
-    run_prediciton(model, english_tensordata_loc, "estonian")
-    run_prediciton(model, estonian_tensordata_loc, "english")
-    """
-
     print("\n\nTRAIN: TRAINING DATA | PREDICTION: ESTONIAN, ENGLISH\n\n")
-
+    
     model = run_WaveNet(wav_root=wav_root,
                         npz_loc=npz_loc,
                         tensordata_loc=tensordata_loc,
@@ -69,7 +59,7 @@ def main():
     run_prediciton(model=model,
                    test_tensordata_loc= english_tensordata_loc,
                    batch_size=16)
-
+    
     print("\n\nTRAIN: TRAINING DATA+ENGLISH | PREDICTION: ESTONIAN\n\n")
 
     model = run_WaveNet(wav_root=[wav_root, english_wav_root],
@@ -83,7 +73,7 @@ def main():
     run_prediciton(model=model,
                    test_tensordata_loc= estonian_tensordata_loc,
                    batch_size=16)
-
+    
     print("\n\nTRAIN: ESTONIAN+ENGLISH | PREDICTION: TRAINING\n\n")
 
     model = run_WaveNet(wav_root=[estonian_wav_root, english_wav_root],
@@ -97,7 +87,7 @@ def main():
     run_prediciton(model=model,
                    test_tensordata_loc=tensordata_loc,
                    batch_size=16)
-
+    """
     print("\n\nTRAIN: ESTONIAN | PREDICTION: ENGLISH\n\n")
 
     model = run_WaveNet(wav_root=estonian_wav_root,
@@ -109,9 +99,50 @@ def main():
                         dims=32)
 
     run_prediciton(model=model,
-                   test_tensordata_loc=estonian_tensordata_loc,
-                   batch_size=16)
+                   test_tensordata_loc=english_tensordata_loc,
+                   batch_size=16,language="english")
 
+    run_prediciton(model=model,
+                   test_tensordata_loc=tensordata_loc,
+                   batch_size=16, language="training")
+
+    sys.stdout = orig_stdout
+    f.close()
+
+    """
+    print("\n\nTRAIN: ENGLISH | PREDICTION: ESTONIAN\n\n")
+
+    model = run_WaveNet(wav_root=english_wav_root,
+                        npz_loc=english_npz_loc,
+                        tensordata_loc=english_tensordata_loc,
+                        matlabroot=matlabroot,
+                        epochs=10,
+                        batch_size=16,
+                        dims=32)
+
+    run_prediciton(model=model,
+                   test_tensordata_loc=tensordata_loc,
+                   batch_size=16, language="training")
+
+    run_prediciton(model=model,
+                   test_tensordata_loc=estonian_tensordata_loc,
+                   batch_size=16, language="estonian")
+    """
+    """
+    print("\n\nTRAIN: TRAINING DATA+ESTONIAN | PREDICTION: ENGLISH\n\n")
+
+    model = run_WaveNet(wav_root=[wav_root, estonian_wav_root],
+                        npz_loc=[npz_loc, estonian_npz_loc],
+                        tensordata_loc= [tensordata_loc, estonian_tensordata_loc],
+                        matlabroot=matlabroot,
+                        epochs=10,
+                        batch_size=8,
+                        dims=32)
+
+    run_prediciton(model=model,
+                   test_tensordata_loc= english_tensordata_loc,
+                   batch_size=8, language="english")
+    """
     sys.stdout = orig_stdout
     f.close()
 
