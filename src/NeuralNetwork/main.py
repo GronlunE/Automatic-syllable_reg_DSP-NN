@@ -1,11 +1,8 @@
 # Own implementation
 import numpy as np
-import pandas as pd
-import sys
 from config import*
-from mat73 import loadmat
-from Tensor import build_data
-from DSP_NN import run_WaveNet, run_prediciton
+from scipy.io import loadmat
+from DSP_NN import run_WaveNet, run_cross_validation, run_prediciton
 
 
 def generate_user_commands():
@@ -17,7 +14,7 @@ def generate_user_commands():
     commands = []
     epochs = 10
     dims = 32
-    batches = 32
+    batches = 16
     while True:
         command = input("Enter command or type 'done' to start execution: ")
 
@@ -35,12 +32,34 @@ def generate_user_commands():
 
         elif command == "crossval":
             commands.append(command)
-            print("Added crossval operation to command list.")
+            languages = []
+
+            while True:
+
+                lang = input("Enter language (estonian or english) or type 'done': ")
+
+                if lang == "done":
+                    if not languages:
+                        print("At least one language must be entered.")
+                        continue
+                    break
+                elif lang not in ["estonian", "snglish"]:
+                    print("Invalid language.")
+                    continue
+
+                languages.append(lang)
+
+            commands.append((command, languages))
+
+            print(f"Added crossval operation with {', '.join(languages)} to command list.")
 
         elif command == "langdep":
             languages = []
+
             while True:
+
                 lang = input("Enter language (french, spanish, polish) or type 'done': ")
+
                 if lang == "done":
                     if not languages:
                         print("At least one language must be entered.")
@@ -49,18 +68,24 @@ def generate_user_commands():
                 elif lang not in ["french", "spanish", "polish"]:
                     print("Invalid language.")
                     continue
+
                 languages.append(lang)
+
             commands.append((command, languages))
+
             print(
                 f"Added language-dependent operation for {len(languages)} "
                 f"languages: {', '.join(languages)} to command list.")
 
         elif command == "datadep":
             n_samples = input("Enter number of samples per language (700, 1425, 2850, 5700): ")
+
             if n_samples not in ["700", "1425", "2850", "5700"]:
                 print("Invalid number of samples.")
                 continue
+
             commands.append((command, n_samples))
+
             print(f"Added data-dependent operation with {n_samples} samples per language to command list.")
 
     return commands, epochs, batches, dims
@@ -71,39 +96,55 @@ def main():
 
     :return:
     """
-    # orig_stdout = sys.stdout
-    # f = open(r"resources\log_test.txt", 'w')
-    # sys.stdout = f
-
+    run_data = {}
+    cross_val_data = {}
     commands, epochs, batches, dims = generate_user_commands()
-
-    # load .mat file
-    data = loadmat(tensordata_loc)
-
-    # extract variables from the .mat file
-    tensor = data['tensor']
-    syllables = np.transpose(data['syllables'])
-    labels = data['labels']
 
     for command in commands:
 
         if command == "crossval":
 
-            break
+            languages = command[1]
+
+            for language in languages:
+                print(f"Performing cross validation for {language}...")
+                dsp_fs, true_fs = run_cross_validation(language=language)
+                cross_val_data[language] = {"DSP_Fscore": dsp_fs, "True_Fscore": true_fs}
 
         else:
+
+            # load .mat file
+            data = loadmat(tensordata_loc)
+
+            # extract variables from the .mat file
+            tensor = data['tensor']
+            syllables = np.transpose(data['syllables'])
+            labels = data['label']
+
+            N = tensor.shape[0]
+
+            # Shuffle data
+            ord_ = np.arange(N)
+            np.random.shuffle(ord_)
+            tensor = tensor[ord_, :, :]
+            syllables = syllables[ord_]
+            labels = labels[ord_]
 
             new_tensor = tensor
             new_syllables = syllables
 
             if command == "basic":
+
                 # Running everything
                 print("Performing the basic test with all data...")
                 pass
 
             elif command[0] == "langdep":
+
                 languages = command[1]
-                print(f"Performing language-dependent operation for {len(languages)} languages: {', '.join(languages)}...")
+
+                print(f"Performing language-dependent operation for {len(languages)} "
+                      f"languages: {', '.join(languages)}...")
 
                 # Divide tensor and syllables arrays into samples per language
                 samples_per_lang = 5700 // len(languages)
@@ -146,10 +187,24 @@ def main():
                 new_syllables = np.concatenate(new_syllables)
 
             # Run Wavenet on new data
-            run_WaveNet(new_tensor, new_syllables, epochs=epochs, batch_size=batches, dims=dims)
+            model, history = run_WaveNet(new_tensor, new_syllables, epochs=epochs, batch_size=batches, dims=dims)
+            weights = model.get_weights()
 
-    # sys.stdout = orig_stdout
-    # f.close()
+            del data, tensor, syllables, labels
 
+            if command[0] == "crossval":
+                run_data[f"Command {commands.index(command)}"] = {"Call": command, "Languages": cross_val_data}
 
+            else:
+                languages = ["estonian", "english"]
+                prediction_data = {}
+
+                for language in languages:
+                    mae, mape = run_prediciton(model=model, batch_size=32, language=language)
+                    prediction_data[language] = {"MAE": mae, "MAPE": mape}
+
+                run_data[f"Command {commands.index(command)}"] = {"Call": command,
+                                                                  "History": history,
+                                                                  "Weights": weights,
+                                                                  "Predictions": prediction_data}
 main()
