@@ -47,5 +47,5 @@ Thumbs.db
 C:\Users\Elmeri\PycharmProjects\Automatic-syllable_reg_DSP-NN\src\matlab\gammatone\**
 C:\Users\Elmeri\PycharmProjects\Automatic-syllable_reg_DSP-NN\src\matlab\thetaOsc\**
 
-src/matlab/thetaOsc/
-src/matlab/gammatone/
+thetaOsc/
+gammatone/
