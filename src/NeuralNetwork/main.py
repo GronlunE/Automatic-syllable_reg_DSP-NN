@@ -1,7 +1,7 @@
 # Own implementation
 import numpy as np
 from config import*
-from scipy.io import loadmat
+from scipy.io import loadmat, savemat
 from DSP_NN import run_WaveNet, run_cross_validation, run_prediciton
 
 
@@ -14,7 +14,7 @@ def generate_user_commands():
     commands = []
     epochs = 10
     dims = 32
-    batches = 16
+    batches = 32
     while True:
         command = input("Enter command or type 'done' to start execution: ")
 
@@ -43,7 +43,7 @@ def generate_user_commands():
                         print("At least one language must be entered.")
                         continue
                     break
-                elif lang not in ["estonian", "snglish"]:
+                elif lang not in ["estonian", "english"]:
                     print("Invalid language.")
                     continue
 
@@ -74,7 +74,7 @@ def generate_user_commands():
             commands.append((command, languages))
 
             print(
-                f"Added language-dependent operation for {len(languages)} "
+                f"Added language-dependence operation for {len(languages)} "
                 f"languages: {', '.join(languages)} to command list.")
 
         elif command == "datadep":
@@ -86,7 +86,7 @@ def generate_user_commands():
 
             commands.append((command, n_samples))
 
-            print(f"Added data-dependent operation with {n_samples} samples per language to command list.")
+            print(f"Added data-dependence operation with {n_samples} samples per language to command list.")
 
     return commands, epochs, batches, dims
 
@@ -97,10 +97,12 @@ def main():
     :return:
     """
     run_data = {}
-    cross_val_data = {}
     commands, epochs, batches, dims = generate_user_commands()
 
     for command in commands:
+
+        cross_val_data = {}
+        prediction_data = {}
 
         if command == "crossval":
 
@@ -118,8 +120,8 @@ def main():
 
             # extract variables from the .mat file
             tensor = data['tensor']
-            syllables = np.transpose(data['syllables'])
-            labels = data['label']
+            syllables = data['syllables']
+            labels = np.transpose(data['labels']).flatten()
 
             N = tensor.shape[0]
 
@@ -130,20 +132,19 @@ def main():
             syllables = syllables[ord_]
             labels = labels[ord_]
 
-            new_tensor = tensor
-            new_syllables = syllables
-
             if command == "basic":
 
                 # Running everything
                 print("Performing the basic test with all data...")
+                new_tensor = tensor
+                new_syllables = syllables
                 pass
 
             elif command[0] == "langdep":
 
                 languages = command[1]
 
-                print(f"Performing language-dependent operation for {len(languages)} "
+                print(f"Performing language-dependence test for {len(languages)} "
                       f"languages: {', '.join(languages)}...")
 
                 # Divide tensor and syllables arrays into samples per language
@@ -151,7 +152,7 @@ def main():
                 tensor_lang = []
                 syllables_lang = []
                 for lang in languages:
-                    lang_indices = labels[:, 0] == lang
+                    lang_indices = np.array(labels[:]) == lang
                     tensor_lang.append(tensor[lang_indices][:samples_per_lang])
                     syllables_lang.append(syllables[lang_indices][:samples_per_lang])
 
@@ -163,7 +164,7 @@ def main():
 
                 n_samples = int(command[1])
 
-                print(f"Performing data-dependent operation with {n_samples} samples per language...")
+                print(f"Performing data-dependence test with {n_samples} samples per language...")
 
                 # Create new arrays for data dependent on n_samples
                 new_tensor = []
@@ -186,25 +187,65 @@ def main():
                 new_tensor = np.concatenate(new_tensor)
                 new_syllables = np.concatenate(new_syllables)
 
+            else:
+
+                new_tensor = tensor
+                new_syllables = syllables
+
+            # Free space
+            del data, tensor, syllables, labels
+
             # Run Wavenet on new data
             model, history = run_WaveNet(new_tensor, new_syllables, epochs=epochs, batch_size=batches, dims=dims)
             weights = model.get_weights()
 
-            del data, tensor, syllables, labels
-
             if command[0] == "crossval":
+
+                # Save crossval results
                 run_data[f"Command {commands.index(command)}"] = {"Call": command, "Languages": cross_val_data}
 
             else:
                 languages = ["estonian", "english"]
-                prediction_data = {}
 
+                # Run predictions
                 for language in languages:
                     mae, mape = run_prediciton(model=model, batch_size=32, language=language)
                     prediction_data[language] = {"MAE": mae, "MAPE": mape}
 
+                # Save results
                 run_data[f"Command {commands.index(command)}"] = {"Call": command,
                                                                   "History": history,
                                                                   "Weights": weights,
                                                                   "Predictions": prediction_data}
+
+            # Delete unnecessary variables
+            del model, weights, history
+
+            savemat(resultmat_loc, run_data)
+
+
+def set_labels():
+
+    # Load the existing mat file
+    tensordata = loadmat(tensordata_loc)
+
+    # Define the labels
+    labels = np.empty(17996, dtype='object')
+    labels[:6000] = 'french'
+    labels[6000:11998] = 'polish'
+    labels[11998:] = 'spanish'
+
+    # Add the labels to the mat file
+    tensordata['labels'] = labels
+
+    # Save the updated mat file
+    savemat(tensordata_loc, tensordata)
+
+    # Add the labels to the mat file
+    tensordata['labels'] = labels
+
+    # Save the updated mat file
+    savemat(tensordata_loc, tensordata)
+
+
 main()

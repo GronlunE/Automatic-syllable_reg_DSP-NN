@@ -17,4 +17,5 @@ english_tensordata_loc = r"resources\english_tensordata.mat"
 estonian_tensordata_loc = r"resources\estonian_tensordata.mat"
 theta_csv_save_loc = r"resources\csv\thetaSylls.csv"
 test_csv_loc = r"C:\Users\Elmeri\PycharmProjects\Automatic-syllable_reg_DSP-NN\src\resources\csv\test_english.csv"
+resultmat_loc = r"resources\results.mat"
 eps = 2.220446049250313e-16

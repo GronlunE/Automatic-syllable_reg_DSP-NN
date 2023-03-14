@@ -234,7 +234,7 @@ def run_prediciton(model, batch_size, language):
     print("Tensor dimensions:", np.shape(np.array(test_tensor)))
     print("Syllable dimensions:", np.shape(np.array(test_syll)), "\n")
 
-    syl_estimates = model.predict(test_tensor, batch_size=batch_size, verbose=2)
+    syl_estimates = model.predict(test_tensor, batch_size=batch_size)
 
     print("Estimated syllable dimensions:", np.shape(syl_estimates))
 
@@ -287,7 +287,7 @@ def run_WaveNet(tensor, syllables, epochs, batch_size, dims):
                         epochs=epochs,
                         batch_size=batch_size,
                         callbacks=[earlystop, model_checkpoint_callback],
-                        validation_split=0.2, verbose=2)
+                        validation_split=0.2)
 
     return model, history
 
