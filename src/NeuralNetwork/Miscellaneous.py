@@ -5,16 +5,16 @@ from librosa import get_duration
 import numpy as np
 import taglib
 import pandas as pd
-from scipy.io import loadmat
+from mat73 import loadmat
+from config import*
 
 # Matlab
 import matlab.engine
 
 
-def get_logMel_shapes(npz_loc):
+def get_logMel_shapes():
     """
 
-    :param npz_loc:
     :return:
     """
     mel_data = np.load(npz_loc)
@@ -30,10 +30,9 @@ def get_logMel_shapes(npz_loc):
     return list_of_mel_shape
 
 
-def get_audio_durs(wav_root):
+def get_audio_durs():
     """
 
-    :param wav_root:
     :return:
     """
     durs = []
@@ -56,10 +55,9 @@ def compare_dur_and_logMel_shape(logMels, durations):
     return
 
 
-def run_matlab_engine(matlabroot):
+def run_matlab_engine():
     """
 
-    :param matlabroot:
     :return:
     """
     sys.path.append(matlabroot)
@@ -91,7 +89,7 @@ def get_file_info(filepath):
     return file_info
 
 
-def write_csv(npz_loc, tensordata_loc):
+def write_csv():
     language_dirs = [r"resources\test_audio\english"]
 
     npz_data = np.load(npz_loc)

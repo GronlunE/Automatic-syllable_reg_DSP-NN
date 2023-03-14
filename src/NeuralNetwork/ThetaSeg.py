@@ -4,11 +4,10 @@ from Miscellaneous import run_matlab_engine
 import pandas as pd
 import os.path
 import taglib
-from scipy.io import savemat
-import glob
+from config import*
 
 
-def thetaSegTest(filepaths, matlabroot, theta_csv_save_loc, test_csv_loc):
+def thetaSegTest(filepaths):
     """
 
     :param filepaths:
@@ -45,7 +44,7 @@ def thetaSegTest(filepaths, matlabroot, theta_csv_save_loc, test_csv_loc):
 
         print("Compiling Dataframe...")
         thetaDF = pd.read_csv(theta_csv_save_loc)
-    return
+
     print("Calculating MA error...")
     testDF = pd.read_csv(test_csv_loc)
     testDictList = testDF.to_dict(orient="records")
@@ -76,7 +75,7 @@ def thetaSegTest(filepaths, matlabroot, theta_csv_save_loc, test_csv_loc):
     return MAE, MAPE
 
 
-def annotate(filepaths, matlabroot):
+def annotate(filepaths):
     """
 
     :param filepaths:

@@ -1,10 +1,11 @@
 import glob
 import numpy as np
 from os import path
-from scipy.io import savemat, loadmat
+from mat73 import savemat, loadmat
 import scipy.io as spio
 from librosa import get_duration
 import pandas as pd
+from config import*
 
 # To open metadata from .wav files
 import taglib
@@ -13,7 +14,7 @@ import taglib
 from Miscellaneous import run_matlab_engine, get_file_info
 
 
-def build_logMel_npz(wav_root, matlabroot, npz_loc):
+def build_logMel_npz():
     """
 
     :return:
@@ -37,7 +38,7 @@ def build_logMel_npz(wav_root, matlabroot, npz_loc):
     np.savez(npz_loc, **npz_dict)
 
 
-def form_dict(wav_root, npz_loc):
+def form_dict():
     """
 
 
@@ -110,7 +111,7 @@ def assemble_tensor(wav_logMels, T=650):
     return output_tensor
 
 
-def build_data(wav_root, npz_loc, matlabroot, tensordata_loc):
+def build_data():
     """
 
     :return:
@@ -118,11 +119,11 @@ def build_data(wav_root, npz_loc, matlabroot, tensordata_loc):
     if not path.exists(tensordata_loc):
         if not path.exists(npz_loc):
             print("Building logMels...")
-            build_logMel_npz(wav_root=wav_root, matlabroot=matlabroot, npz_loc=npz_loc)
+            build_logMel_npz()
 
         print("Unpacking syllables and logMels...\n")
         # Form "filename: [syllables, log-Mel]" dict for the existing audio files
-        data_dict = form_dict(wav_root=wav_root, npz_loc=npz_loc)
+        data_dict = form_dict()
 
         list_of_log_mels = []
         syllables = []
@@ -148,7 +149,7 @@ def build_data(wav_root, npz_loc, matlabroot, tensordata_loc):
     return tensor, syll_train
 
 
-def import_test_mat(wav_root, npz_loc, tensordata_loc, language):
+def import_test_mat(language):
 
     mat_loc = r"resources\test_audio\english\SWB_anno.mat"
     mat2_loc = r"resources\test_audio\estonian\SKK_anno.mat"

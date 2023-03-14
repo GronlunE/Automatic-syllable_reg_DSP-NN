@@ -2,8 +2,9 @@ import keras.callbacks
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import Inf
-from scipy.io import loadmat
-
+from mat73 import loadmat
+from config import*
+from sklearn.model_selection import KFold
 
 # Keras
 import tensorflow as tf
@@ -14,12 +15,6 @@ from keras.metrics import MeanAbsoluteError, MeanAbsolutePercentageError
 from keras import regularizers
 from keras.models import Model
 import keras.losses
-
-# Own implementation
-from Tensor import build_data
-
-
-eps = 2.220446049250313e-16
 
 
 def causal_attention_mask(batch_size, n_dest, n_src, dtype):
@@ -212,7 +207,7 @@ def plot_model(model):
     plt.show()
 
 
-def run_prediciton(model, test_tensordata_loc, batch_size, language):
+def run_prediciton(model, batch_size, language):
     """
 
     :param language:
@@ -253,67 +248,38 @@ def run_prediciton(model, test_tensordata_loc, batch_size, language):
     print("MeanAbsolutePercentageError:", mean_abs_pct_err)
 
 
-def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlabroot, epochs, batch_size, dims):
+def run_WaveNet(tensor, syllables, epochs, batch_size, dims):
     """
 
-    :param dims:
-    :param tensordata_loc:
-    :param npz_loc:
-    :param wav_root:
-    :param matlabroot:
-    :param wav_root:
+    :param tensor:
+    :param syllables:
     :param epochs:
     :param batch_size:
+    :param dims:
     :return:
     """
 
-    tensors = []
-    syll_trains = []
-
-    # Get tensor and syllables for the audio segments
-    if type(tensordata_loc) == list:
-        for k in range(len(tensordata_loc)):
-            tensor, syll_train = build_data(wav_root=wav_root[k],
-                                            matlabroot=matlabroot,
-                                            npz_loc=npz_loc[k],
-                                            tensordata_loc=tensordata_loc[k])
-            tensors.append(tensor)
-            syll_trains.append(syll_train)
-
-        tensor = np.concatenate(tensors, axis=0)
-        syll_train = np.concatenate(syll_trains, axis=0)
-
-    else:
-        tensor, syll_train = build_data(wav_root=wav_root,
-                                        matlabroot=matlabroot,
-                                        npz_loc=npz_loc,
-                                        tensordata_loc=tensordata_loc)
-
     tensor[tensor == -np.inf] = 20*np.log10(eps)
     print("Tensor dimensions:", np.shape(tensor))
-    print("Syllable dimensions:", np.shape(syll_train))
+    print("Syllable dimensions:", np.shape(syllables))
 
-    # D = tensor.shape[2]
-    # T = tensor.shape[1]
     N = tensor.shape[0]
 
     # Shuffle data (so that validation split also contains data from all languages)
     ord_ = np.arange(N)
     np.random.shuffle(ord_)
     tensor = tensor[ord_, :, :]
-    syll_train = syll_train[ord_]
+    syll_train = syllables[ord_]
 
     # strategy = tf.distribute.Strategy()
     # print("Number of devices: {}".format(strategy.num_replicas_in_sync))
-
     model = wavenet_model(tensor, dims)
+
     # Compile the model
     model.compile(optimizer='adam', loss='mean_absolute_percentage_error',
                   metrics=[MeanAbsoluteError(), MeanAbsolutePercentageError()])
-    # model_c.compile(optimizer='adam', loss='mean_absolute_percentage_error',
-    #                metrics=[MeanAbsoluteError(), MeanAbsolutePercentageError()])
 
-    earlystop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10)
+    earlystop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
 
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=r"resources/wavenet_model.h5",
@@ -329,7 +295,74 @@ def run_WaveNet(wav_root, npz_loc, tensordata_loc, matlabroot, epochs, batch_siz
                         callbacks=[earlystop, model_checkpoint_callback],
                         validation_split=0.2, verbose=2)
 
-    # callbacks=[keras.callbacks.LearningRateScheduler(lambda epoch: 1e-4 * 10 ** (epoch/30))]
-    # plot_model(history)
-
     return model
+
+
+def run_cross_validation(language, dims):
+    # Load in the data from the .mat file
+    if language == "estonian":
+        data = loadmat(estonian_tensordata_loc)
+    else:
+        data = loadmat(english_tensordata_loc)
+    tensor = data["tensor"]
+    syllables = data["syllables"]
+    true_syllables = data["true_syllables"]
+
+    # Define your model and any other necessary variables
+    model = wavenet_model(tensor, dims)
+    n_folds = 5  # Number of folds to use for cross-validation
+
+    # Initialize the KFold object to split the data into train and test sets for each fold
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+
+    # Define a function to compute the accuracy score for each fold
+    def compute_fold_score(X_train, y_train, X_test, y_test):
+        # Train your model on the current fold
+        model.fit(X_train, y_train)
+        # Compute the accuracy score on the test set for this fold
+        score = model.score(X_test, y_test)
+        return score
+
+    # Initialize a list to store the scores for each fold
+
+    fold_scores_True = []
+    fold_scores_DSP = []
+
+    # Loop over each fold True
+    for i, (train_index, test_index) in enumerate(kf.split(tensor)):
+
+        print(f"Fold True{i + 1}:")
+
+        # Split the data into train and test sets for this fold
+        X_train, y_train = tensor[test_index], syllables[test_index]
+        X_test, y_test = tensor[test_index], true_syllables[test_index]
+
+        # Compute the score for this fold
+        fold_score = compute_fold_score(X_train, y_train, X_test, y_test)
+        print(f"Score: {fold_score}")
+        fold_scores_True.append(fold_score)
+
+    # Loop over each fold DSP
+    for i, (train_index, test_index) in enumerate(kf.split(tensor)):
+
+        print(f"Fold DSP{i + 1}:")
+
+        # Split the data into train and test sets for this fold
+        X_train, y_train = tensor[train_index], syllables[train_index]
+        X_test, y_test = tensor[test_index], true_syllables[test_index]
+
+        # Compute the score for this fold
+        fold_score = compute_fold_score(X_train, y_train, X_test, y_test)
+        print(f"Score: {fold_score}")
+        fold_scores_True.append(fold_score)
+
+    # Compute and print the overall cross-validation score
+    print(f"Overall true cross-validation score for {language}: {np.mean(fold_scores_True)}")
+    print(f"Overall DSP cross-validation score for {language}: {np.mean(fold_scores_DSP)}")
+
+
+# Run cross-validation for English
+run_cross_validation("english", 32)
+
+# Run cross-validation for Estonian
+run_cross_validation("estonian", 32)
