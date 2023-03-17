@@ -11,16 +11,13 @@ def thetaSegTest(filepaths):
     """
 
     :param filepaths:
-    :param matlabroot:
-    :param theta_csv_save_loc:
-    :param test_csv_loc:
     :return:
     """
     print("Commencing Theta Segmentation...")
 
     if not os.path.isfile(theta_csv_save_loc):
 
-        eng = run_matlab_engine(matlabroot= matlabroot)
+        eng = run_matlab_engine()
         values = np.array(eng.thetaseg(filepaths))
         filenames = []
         sylls = []
@@ -79,10 +76,8 @@ def annotate(filepaths):
     """
 
     :param filepaths:
-    :param matlabroot:
     :return:
     """
-    eng = run_matlab_engine(matlabroot=matlabroot)
     values = pd.read_csv(r"resources\csv\thetaSyllsTrain.csv")["Syllables"].tolist()
     print("Compiling dict...")
     for filepath in filepaths:
@@ -91,4 +86,3 @@ def annotate(filepaths):
         wav = taglib.File(filepath)
         wav.tags["SYLLABLE_COUNT"] = [str(syllables)]
         wav.save()
-

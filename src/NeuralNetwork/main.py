@@ -10,17 +10,26 @@ def generate_user_commands():
 
     :return:
     """
-    valid_commands = ["basic", "langdep", "datadep", "crossval", "done"]
+    valid_commands = ["basic", "langdep", "datadep", "crossval", "begin", "demo"]
     commands = []
-    epochs = 10
+    epochs = 1
     dims = 32
     batches = 32
     while True:
-        command = input("Enter command or type 'done' to start execution: ")
+        command = input("Enter command or type 'begin' to start execution: ")
 
-        if command == "done":
+        if command == "begin":
             print("Starting execution...")
             break
+
+        if command == "demo":
+            commands = [("datadep", "700"),
+                        ("langdep", ["french", "spanish", "polish"]),
+                        ("crossval", ["estonian", "english"])]
+
+            print(
+                f"Added demo operation with commands "
+                f": {commands} to command list.")
 
         if command not in valid_commands:
             print("Invalid command.")
@@ -30,8 +39,10 @@ def generate_user_commands():
             commands.append(command)
             print("Added basic operation to command list.")
 
+        elif command == "baseline":
+            continue
+
         elif command == "crossval":
-            commands.append(command)
             languages = []
 
             while True:
@@ -58,12 +69,15 @@ def generate_user_commands():
 
             while True:
 
-                lang = input("Enter language (french, spanish, polish) or type 'done': ")
+                lang = input("Enter language (french, spanish, polish, all) or type 'done': ")
 
                 if lang == "done":
                     if not languages:
                         print("At least one language must be entered.")
                         continue
+                    break
+                elif lang == "all":
+                    languages = ["french", "spanish", "polish"]
                     break
                 elif lang not in ["french", "spanish", "polish"]:
                     print("Invalid language.")
@@ -96,15 +110,14 @@ def main():
 
     :return:
     """
-    run_data = {}
+    matlab_data = {}
     commands, epochs, batches, dims = generate_user_commands()
-
     for command in commands:
 
         cross_val_data = {}
         prediction_data = {}
 
-        if command == "crossval":
+        if command[0] == "crossval":
 
             languages = command[1]
 
@@ -139,6 +152,9 @@ def main():
                 new_tensor = tensor
                 new_syllables = syllables
                 pass
+
+            elif command == "baseline":
+                continue
 
             elif command[0] == "langdep":
 
@@ -199,10 +215,22 @@ def main():
             model, history = run_WaveNet(new_tensor, new_syllables, epochs=epochs, batch_size=batches, dims=dims)
             weights = model.get_weights()
 
+            history_dict = {'Loss': history.history['loss'],
+                            'MAE': history.history['mean_absolute_error'],
+                            "MAPE": history.history['mean_absolute_percentage_error'],
+                            "Val_Loss": history.history['val_loss'],
+                            "Val_MAE": history.history['val_mean_absolute_error'],
+                            "Val_MAPE": history.history['val_mean_absolute_percentage_error']}
+
             if command[0] == "crossval":
 
                 # Save crossval results
-                run_data[f"Command {commands.index(command)}"] = {"Call": command, "Languages": cross_val_data}
+                matlab_data[f"Command {commands.index(command)}"] = {"Call": command, "Languages": cross_val_data}
+
+            elif command == "baseline":
+
+                baseline_score = {}
+                matlab_data[f"Command {commands.index(command)}"] = {"Call": command, "Languages": baseline_score}
 
             else:
                 languages = ["estonian", "english"]
@@ -210,42 +238,19 @@ def main():
                 # Run predictions
                 for language in languages:
                     mae, mape = run_prediciton(model=model, batch_size=32, language=language)
-                    prediction_data[language] = {"MAE": mae, "MAPE": mape}
+                    prediction_data[language] = {"MAE": np.array([mae]), "MAPE": np.array([mape])}
 
                 # Save results
-                run_data[f"Command {commands.index(command)}"] = {"Call": command,
-                                                                  "History": history,
-                                                                  "Weights": weights,
-                                                                  "Predictions": prediction_data}
+                matlab_data[f"Command_{commands.index(command) + 1}"] = {"Call": np.array(command),
+                                                                         "Weights": np.array(weights, dtype=object),
+                                                                         "History": history_dict,
+                                                                         "Predictions": prediction_data}
 
             # Delete unnecessary variables
-            del model, weights, history
 
-            savemat(resultmat_loc, run_data)
+        del model
 
-
-def set_labels():
-
-    # Load the existing mat file
-    tensordata = loadmat(tensordata_loc)
-
-    # Define the labels
-    labels = np.empty(17996, dtype='object')
-    labels[:6000] = 'french'
-    labels[6000:11998] = 'polish'
-    labels[11998:] = 'spanish'
-
-    # Add the labels to the mat file
-    tensordata['labels'] = labels
-
-    # Save the updated mat file
-    savemat(tensordata_loc, tensordata)
-
-    # Add the labels to the mat file
-    tensordata['labels'] = labels
-
-    # Save the updated mat file
-    savemat(tensordata_loc, tensordata)
+    savemat(resultmat_loc, matlab_data)
 
 
 main()

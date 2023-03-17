@@ -21,7 +21,7 @@ def build_logMel_npz():
     """
     npz_dict = {}
     n = 0
-    eng = run_matlab_engine(matlabroot=matlabroot)
+    eng = run_matlab_engine()
 
     for filepath in glob.glob(wav_root, recursive=True):
         file_info = get_file_info(filepath)

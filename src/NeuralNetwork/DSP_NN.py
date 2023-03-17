@@ -1,11 +1,9 @@
 import keras.callbacks
 import numpy as np
 import matplotlib.pyplot as plt
-from numpy import Inf
 from mat73 import loadmat
 from config import*
 from sklearn.model_selection import KFold
-
 # Keras
 import tensorflow as tf
 from keras import layers
@@ -215,9 +213,20 @@ def run_prediciton(model, batch_size, language):
     :param model:
     :return:
     """
-    mat_data = loadmat(test_tensordata_loc)
 
     print("\nLoading testing data...", "\n")
+
+    if language == "estonian":
+
+        mat_data = loadmat(estonian_tensordata_loc)
+
+    elif language == "english":
+
+        mat_data = loadmat(english_tensordata_loc)
+
+    else:
+
+        mat_data = loadmat(tensordata_loc)
 
     test_tensor = mat_data["tensor"]
 
@@ -229,7 +238,7 @@ def run_prediciton(model, batch_size, language):
         test_syll = np.transpose(mat_data["syllables"])
 
     test_syll[test_syll == 0] = 1
-    test_tensor[test_tensor == -np.inf] = 20*np.log10(eps)
+    test_tensor[np.isnan(test_tensor)] = 20*np.log10(eps)
 
     print("Tensor dimensions:", np.shape(np.array(test_tensor)))
     print("Syllable dimensions:", np.shape(np.array(test_syll)), "\n")
@@ -311,9 +320,11 @@ def run_cross_validation(language, dims=32, n_folds=5):
         data = loadmat(english_tensordata_loc)
 
     tensor = data["tensor"]
-    tensor[tensor == -np.inf] = 20*np.log10(eps)
+    tensor[np.isnan(tensor)] = 20*np.log10(eps)
     syllables = data["syllables"]
+    syllables[syllables == 0] = 1
     true_syllables = data["true_syllables"]
+    true_syllables[true_syllables == 0] = 1
 
     N = tensor.shape[0]
 
@@ -326,17 +337,18 @@ def run_cross_validation(language, dims=32, n_folds=5):
     # Define your model and any other necessary variables
     model = wavenet_model(tensor, dims)
     model.compile(optimizer='adam', loss='mean_absolute_percentage_error',)
+
     # Initialize the KFold object to split the data into train and test sets for each fold
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
 
     # Define a function to compute the accuracy score for each fold
-    def compute_fold_score(X_train, y_train, X_test, y_test):
+    def compute_fold_score(Xtrain, ytrain, Xtest, ytest):
 
         # Train your model on the current fold
-        model.fit(X_train, y_train)
+        model.fit(Xtrain, ytrain)
 
         # Compute the accuracy score on the test set for this fold
-        score = model.evaluate(X_test, y_test)
+        score = model.evaluate(Xtest, ytest)
 
         return score
 

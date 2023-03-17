@@ -3,10 +3,10 @@ import sys
 import matplotlib.pyplot as plt
 from librosa import get_duration
 import numpy as np
-import taglib
 import pandas as pd
 from mat73 import loadmat
 from config import*
+from scipy.io import savemat
 
 # Matlab
 import matlab.engine
@@ -138,3 +138,27 @@ def get_filepaths(root):
         filepaths.append(filepath)
 
     return filepaths
+
+
+def set_labels():
+
+    # Load the existing mat file
+    tensordata = loadmat(tensordata_loc)
+
+    # Define the labels
+    labels = np.empty(17996, dtype='object')
+    labels[:6000] = 'french'
+    labels[6000:11998] = 'polish'
+    labels[11998:] = 'spanish'
+
+    # Add the labels to the mat file
+    tensordata['labels'] = labels
+
+    # Save the updated mat file
+    savemat(tensordata_loc, tensordata)
+
+    # Add the labels to the mat file
+    tensordata['labels'] = labels
+
+    # Save the updated mat file
+    savemat(tensordata_loc, tensordata)
