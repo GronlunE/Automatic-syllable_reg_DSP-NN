@@ -2,30 +2,94 @@
 import numpy as np
 from config import*
 from scipy.io import loadmat, savemat
-from DSP_NN import run_WaveNet, run_cross_validation, run_prediciton
+from DSP_NN import run_WaveNet, run_cross_validation, run_prediction, set_baseline
 
 
 def generate_user_commands():
     """
-
+    Asks the user for the tests
     :return:
     """
-    valid_commands = ["basic", "langdep", "datadep", "crossval", "begin", "demo"]
+    valid_commands = ["basic",
+                      "langdep",
+                      "datadep",
+                      "crossval",
+                      "begin",
+                      "demo",
+                      "baseline",
+                      "langdep_full",
+                      "datadep_full",
+                      "config"]
     commands = []
-    epochs = 1
+    epochs = 100
     dims = 32
     batches = 32
+    print(f"Epochs: {epochs}\nDims: {dims}\nBatches: {batches}")
     while True:
-        command = input("Enter command or type 'begin' to start execution: ")
+        command = input(f"Enter command or type 'begin' to start execution: ")
 
         if command == "begin":
             print("Starting execution...")
             break
 
+        if command == "configure":
+            confs_legal = ["epochs", "dims", "batches"]
+
+            while True:
+                conf = input(f"Input one of {confs_legal} and an integer. Separate with space. If done type 'done':")
+
+                if conf == "done":
+                    break
+
+                elif conf:
+                    split = conf.split(" ")
+
+                    if len(split) == 2:
+
+                        if split[0] in confs_legal and split[1].isdigit():
+
+                            if split[0] == "epochs":
+                                epochs = split[1]
+                            elif split[0] == "dims":
+                                dims = split[1]
+                            elif split[0] == "batches":
+                                batches = split[1]
+
+                            print(f"Successfully set {split[0]} to {split[1]}")
+                            print(f"Epochs: {epochs}\nDims: {dims}\nBatches: {batches}")
+                            continue
+
+                print("Invalid command.")
+
         if command == "demo":
             commands = [("datadep", "700"),
                         ("langdep", ["french", "spanish", "polish"]),
                         ("crossval", ["estonian", "english"])]
+
+            print(
+                f"Added demo operation with commands "
+                f": {commands} to command list.")
+
+        if command == "langdep_full":
+            commands = ["langdep_full",
+                        ("langdep", ["french"]),
+                        ("langdep", ["polish"]),
+                        ("langdep", ["spanish"]),
+                        ("langdep", ["french", "polish"]),
+                        ("langdep", ["french", "spanish"]),
+                        ("langdep", ["polish", "spanish"]),
+                        ("langdep", ["french", "polish", "spanish"])]
+
+            print(
+                f"Added demo operation with commands "
+                f": {commands} to command list.")
+
+        if command == "datadep_full":
+            commands = ["datadep_full",
+                        ("datadep", "700"),
+                        ("datadep", "1425"),
+                        ("datadep", "2850"),
+                        ("datadep", "5700")]
 
             print(
                 f"Added demo operation with commands "
@@ -40,6 +104,8 @@ def generate_user_commands():
             print("Added basic operation to command list.")
 
         elif command == "baseline":
+            commands.append(command)
+            print(f"Added {command} operation to command list.")
             continue
 
         elif command == "crossval":
@@ -110,12 +176,19 @@ def main():
 
     :return:
     """
+
     matlab_data = {}
     commands, epochs, batches, dims = generate_user_commands()
+    new_tensor = []
+    new_syllables = []
+
     for command in commands:
 
         cross_val_data = {}
         prediction_data = {}
+        history_dict = {}
+        model = []
+# ----------------------------------------------EXECUTE COMMANDS--------------------------------------------------------
 
         if command[0] == "crossval":
 
@@ -123,8 +196,22 @@ def main():
 
             for language in languages:
                 print(f"Performing cross validation for {language}...")
-                dsp_fs, true_fs = run_cross_validation(language=language)
-                cross_val_data[language] = {"DSP_Fscore": dsp_fs, "True_Fscore": true_fs}
+                true_mae, true_mape, dsp_mae, dsp_mape = run_cross_validation(language=language)
+                cross_val_data[language] = {"DSP_MAE": dsp_mae,
+                                            "DSP_MAPE": dsp_mape,
+                                            "True_MAE": true_mae,
+                                            "True_MAPE": true_mape}
+
+        elif command == "langdep_full" or command == "datadep_full":
+            continue
+
+        elif command == "baseline":
+            languages = ["estonian", "english"]
+            baseline_score = {}
+
+            for language in languages:
+                mae, mape = set_baseline(language)
+                baseline_score[language] = {"MAE": mae, "MAPE": mape}
 
         else:
 
@@ -154,7 +241,12 @@ def main():
                 pass
 
             elif command == "baseline":
-                continue
+                languages = ["estonian", "english"]
+                baseline_score = {}
+
+                for language in languages:
+                    mae, mape = set_baseline(language)
+                    baseline_score[language] = {"MAE": mae, "MAPE": mape}
 
             elif command[0] == "langdep":
 
@@ -203,54 +295,59 @@ def main():
                 new_tensor = np.concatenate(new_tensor)
                 new_syllables = np.concatenate(new_syllables)
 
-            else:
-
-                new_tensor = tensor
-                new_syllables = syllables
-
             # Free space
             del data, tensor, syllables, labels
 
             # Run Wavenet on new data
             model, history = run_WaveNet(new_tensor, new_syllables, epochs=epochs, batch_size=batches, dims=dims)
-            weights = model.get_weights()
 
             history_dict = {'Loss': history.history['loss'],
                             'MAE': history.history['mean_absolute_error'],
                             "MAPE": history.history['mean_absolute_percentage_error'],
                             "Val_Loss": history.history['val_loss'],
                             "Val_MAE": history.history['val_mean_absolute_error'],
-                            "Val_MAPE": history.history['val_mean_absolute_percentage_error']}
+                            "Val_MAPE": history.history['val_mean_absolute_percentage_error'],
+                            "Epochs": epochs}
 
-            if command[0] == "crossval":
+# ---------------------------------------------ORGANIZING THE DATA------------------------------------------------------
 
-                # Save crossval results
-                matlab_data[f"Command {commands.index(command)}"] = {"Call": command, "Languages": cross_val_data}
+        if command[0] == "crossval":
 
-            elif command == "baseline":
+            # Save crossval results
+            matlab_data[f"Command_{commands.index(command) + 1}"] = {"Call": np.array(command, dtype=object),
+                                                                     "Languages": cross_val_data}
 
-                baseline_score = {}
-                matlab_data[f"Command {commands.index(command)}"] = {"Call": command, "Languages": baseline_score}
+        elif command == "baseline":
 
-            else:
-                languages = ["estonian", "english"]
+            baseline_score = {}
+            matlab_data[f"Command_{commands.index(command) + 1}"] = {"Call": command,
+                                                                     "Languages": baseline_score}
 
-                # Run predictions
-                for language in languages:
-                    mae, mape = run_prediciton(model=model, batch_size=32, language=language)
-                    prediction_data[language] = {"MAE": np.array([mae]), "MAPE": np.array([mape])}
+        else:
+            languages = ["estonian", "english"]
 
-                # Save results
-                matlab_data[f"Command_{commands.index(command) + 1}"] = {"Call": np.array(command),
-                                                                         "Weights": np.array(weights, dtype=object),
-                                                                         "History": history_dict,
-                                                                         "Predictions": prediction_data}
+            # Run predictions
+            for language in languages:
+                mae, mape = run_prediction(model=model, batch_size=32, language=language)
+                prediction_data[language] = {"MAE": np.array([mae]), "MAPE": np.array([mape])}
 
+            # Save results
+            matlab_data[f"Command_{commands.index(command) + 1}"] = {"Call": np.array(command, dtype=object),
+                                                                     "History": history_dict,
+                                                                     "Predictions": prediction_data}
             # Delete unnecessary variables
+            del model
 
-        del model
+# ---------------------------------------------SAVING THE DATA----------------------------------------------------------
 
-    savemat(resultmat_loc, matlab_data)
+    if commands[0] == "langdep_full":
+        savemat(langdep_resultmat_loc, matlab_data)
+
+    elif commands[0] == "datadep_full":
+        savemat(datadep_resultmat_loc, matlab_data)
+
+    else:
+        savemat(resultmat_loc, matlab_data)
 
 
 main()

@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mat73 import loadmat
 from config import*
-from sklearn.model_selection import KFold
+
 # Keras
 import tensorflow as tf
 from keras import layers
@@ -205,7 +205,7 @@ def plot_model(model):
     plt.show()
 
 
-def run_prediciton(model, batch_size, language):
+def run_prediction(model, batch_size, language):
     """
 
     :param language:
@@ -231,32 +231,34 @@ def run_prediciton(model, batch_size, language):
     test_tensor = mat_data["tensor"]
 
     if language == "english" or language == "estonian":
-        print("Testing against true values")
+        print("Testing against true values\n")
         test_syll = np.transpose(mat_data["true_syllables"])
     else:
-        print("Testing against thetaseg values")
+        print("Testing against thetaseg values\n")
         test_syll = np.transpose(mat_data["syllables"])
 
-    test_syll[test_syll == 0] = 1
-    test_tensor[np.isnan(test_tensor)] = 20*np.log10(eps)
+    test_tensor = test_tensor[test_syll != 0]
+    test_syll = test_syll[test_syll != 0]
+
+    # Find the indices of the NaN values in the tensor
+    nan_indices = np.argwhere(np.isnan(test_tensor))
+
+    # Remove the NaN values from the tensor and update the label array
+    test_tensor = np.delete(test_tensor, nan_indices[:, 0], axis=0)
+    test_syll = np.delete(test_syll, nan_indices[:, 0], axis=0)
 
     print("Tensor dimensions:", np.shape(np.array(test_tensor)))
     print("Syllable dimensions:", np.shape(np.array(test_syll)), "\n")
 
-    syl_estimates = model.predict(test_tensor, batch_size=batch_size)
+    syll_estimates = model.predict(test_tensor, batch_size=batch_size)
 
-    print("Estimated syllable dimensions:", np.shape(syl_estimates))
+    mae = np.nanmean(np.abs(syll_estimates[:, 0, 0] - test_syll))
+    mape = np.nanmean(np.abs(syll_estimates[:, 0, 0] - test_syll) / test_syll) * 100
 
-    MAE = keras.losses.MeanAbsoluteError()
-    MAPE = keras.losses.MeanAbsolutePercentageError()
+    print(f"\nMeanAbsoluteError: {mae}")
+    print(f"MeanAbsolutePercentageError: {mape}\n")
 
-    mean_abs_err = MAE(test_syll, np.array(syl_estimates).transpose()).numpy()
-    mean_abs_pct_err = MAPE(test_syll, syl_estimates).numpy()
-
-    print("\n" + "MeanAbsoluteError:", mean_abs_err)
-    print("MeanAbsolutePercentageError:", mean_abs_pct_err)
-
-    return mean_abs_err, mean_abs_pct_err
+    return mae, mape
 
 
 def run_WaveNet(tensor, syllables, epochs, batch_size, dims):
@@ -282,7 +284,7 @@ def run_WaveNet(tensor, syllables, epochs, batch_size, dims):
     model.compile(optimizer='adam', loss='mean_absolute_percentage_error',
                   metrics=[MeanAbsoluteError(), MeanAbsolutePercentageError()])
 
-    earlystop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+    earlystop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=15)
 
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=r"resources/wavenet_model.h5",
@@ -296,20 +298,60 @@ def run_WaveNet(tensor, syllables, epochs, batch_size, dims):
                         epochs=epochs,
                         batch_size=batch_size,
                         callbacks=[earlystop, model_checkpoint_callback],
-                        validation_split=0.2)
+                        validation_split=0.3)
 
     return model, history
 
 
-def run_cross_validation(language, dims=32, n_folds=5):
+def set_baseline(language):
+
+    if language == "estonian":
+
+        data = loadmat(estonian_tensordata_loc)
+
+    else:
+
+        data = loadmat(english_tensordata_loc)
+
+    syllables = data["syllables"]
+    true_syllables = data["true_syllables"]
+    true_syllables[true_syllables == 0] = 1
+
+    MAE = []
+    MAPE = []
+
+    for i in range(np.size(syllables)):
+        testSyllables = true_syllables[i]
+        thetaSyllables = syllables[i]
+
+        MAE.append(np.absolute(testSyllables-thetaSyllables))
+        MAPE.append(np.absolute(((testSyllables-thetaSyllables)/testSyllables)*100))
+
+        if i % 1000 == 0:
+            print(i, "Done")
+
+    print("All Done")
+    print("\n")
+
+    MAE = np.mean(np.array(MAE))
+    MAPE = np.mean(np.array(MAPE))
+
+    print(f"Baseline to beat for: {language}\n")
+    print(f"MAE: {MAE}")
+    print(f"MAPE: {MAPE}")
+    print("\n")
+
+    return MAE, MAPE
+
+
+def run_cross_validation(language, dims=32):
     """
 
-    :param n_folds:
     :param language:
     :param dims:
     :return:
     """
-
+    # -----------------------------------------------------DATA---------------------------------------------------------
     # Load in the data from the .mat file
     if language == "estonian":
 
@@ -320,11 +362,18 @@ def run_cross_validation(language, dims=32, n_folds=5):
         data = loadmat(english_tensordata_loc)
 
     tensor = data["tensor"]
-    tensor[np.isnan(tensor)] = 20*np.log10(eps)
     syllables = data["syllables"]
-    syllables[syllables == 0] = 1
     true_syllables = data["true_syllables"]
-    true_syllables[true_syllables == 0] = 1
+    tensor = tensor[true_syllables != 0]
+    syllables = syllables[true_syllables != 0]
+    true_syllables = true_syllables[true_syllables != 0]
+
+    # Find the indices of the NaN values in the tensor
+    nan_indices = np.argwhere(np.isnan(tensor))
+
+    # Remove the NaN values from the tensor and update the label array
+    tensor = np.delete(tensor, nan_indices[:, 0], axis=0)
+    syllables = np.delete(syllables, nan_indices[:, 0], axis=0)
 
     N = tensor.shape[0]
 
@@ -334,61 +383,64 @@ def run_cross_validation(language, dims=32, n_folds=5):
     syllables = syllables[ord_]
     true_syllables = true_syllables[ord_]
 
-    # Define your model and any other necessary variables
+    # Compile model
     model = wavenet_model(tensor, dims)
-    model.compile(optimizer='adam', loss='mean_absolute_percentage_error',)
+    model.compile(optimizer='adam', loss='mean_absolute_percentage_error', )
+    model.save_weights(initial_weights)
 
-    # Initialize the KFold object to split the data into train and test sets for each fold
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+    # --------------------------------------------------CROSS-FOLD------------------------------------------------------
+    index_list = list(range(N))
+    fold_maes_dsp = []
+    fold_mapes_dsp = []
+    fold_maes_true = []
+    fold_mapes_true = []
 
-    # Define a function to compute the accuracy score for each fold
-    def compute_fold_score(Xtrain, ytrain, Xtest, ytest):
+    for i in range(10):
 
-        # Train your model on the current fold
-        model.fit(Xtrain, ytrain)
+        print(f"Fold: {i} For: {language}")
 
-        # Compute the accuracy score on the test set for this fold
-        score = model.evaluate(Xtest, ytest)
+        # Derive data for the fold.
+        train_index = index_list[0:int(0.9 * len(index_list))]
+        test_index = index_list[int(0.9 * len(index_list)) + 1:]
+        np.roll(index_list, -int(len(index_list) * 0.1))
 
-        return score
+        X_train = tensor[train_index]
+        X_test = tensor[test_index]
+        y_train_dsp = syllables[train_index]
+        y_train_true = true_syllables[train_index]
+        true_test = true_syllables[test_index]
 
-    # Initialize lists to store the scores for each fold
-    fold_scores_True = []
-    fold_scores_DSP = []
+        # Reset model for training.
+        model.load_weights(initial_weights)
 
-    # Loop over each fold with True to True
-    for i, (train_index, test_index) in enumerate(kf.split(tensor)):
+        # Train the model with dsp labels and predict syllables.
+        print("With DSP labels for")
+        model.fit(X_train, y_train_dsp, epochs=5, batch_size=32)
+        pred_dsp = model.predict(X_test)
 
-        print(f"Fold True {i + 1}:")
+        # MAE and MAPE for dsp-label trained model.
+        fold_maes_dsp.append(np.mean(np.abs(true_test - pred_dsp)))
+        fold_mapes_dsp.append(np.mean(np.abs((true_test - pred_dsp) / true_test) * 100))
 
-        # Split the data into train and test sets for this fold
-        X_train, y_train = tensor[test_index], true_syllables[test_index]
-        X_test, y_test = tensor[test_index], true_syllables[test_index]
+        # Reset model for training.
+        model.load_weights(initial_weights)
 
-        # Compute the score for this fold
-        fold_score = compute_fold_score(X_train, y_train, X_test, y_test)
-        print(f"Score: {fold_score}")
-        fold_scores_True.append(fold_score)
+        # Train the model with true labels and predict syllables.
+        print("With true labels")
+        model.fit(X_train, y_train_true, epochs=5, batch_size=32)
+        pred_true = model.predict(X_test)
 
-    # Loop over each fold with DSP to True
-    for i, (train_index, test_index) in enumerate(kf.split(tensor)):
+        # MAE and MAPE for true-label trained model.
+        fold_maes_true.append(np.mean(np.abs(true_test - pred_true)))
+        fold_mapes_true.append(np.mean(np.abs((true_test - pred_true) / true_test) * 100))
 
-        print(f"Fold DSP {i + 1}:")
+    mean_mae_True = np.mean([score for score in fold_maes_true])
+    mean_mape_True = np.mean([score for score in fold_mapes_true])
+    mean_mae_DSP = np.mean([score for score in fold_maes_dsp])
+    mean_mape_DSP = np.mean([score for score in fold_mapes_dsp])
 
-        # Split the data into train and test sets for this fold
-        X_train, y_train = tensor[train_index], syllables[train_index]
-        X_test, y_test = tensor[test_index], true_syllables[test_index]
+    print(f"Overall True cross-validation score for {language}: MAE={mean_mae_True}, MAPE={mean_mape_True}")
+    print(f"Overall DSP cross-validation score for {language}: MAE={mean_mae_DSP}, MAPE={mean_mape_DSP}")
 
-        # Compute the score for this fold
-        fold_score = compute_fold_score(X_train, y_train, X_test, y_test)
-        print(f"Score: {fold_score}")
-        fold_scores_DSP.append(fold_score)
+    return mean_mae_True, mean_mape_True, mean_mae_DSP, mean_mape_DSP
 
-    # Compute and print the overall cross-validation score
-    print(f"Overall True cross-validation score for {language}: {np.mean(fold_scores_True)}")
-    print(f"Overall DSP cross-validation score for {language}: {np.mean(fold_scores_DSP)}")
-
-    true_fscore = np.mean(fold_scores_True)
-    dsp_fscore = np.mean(fold_scores_DSP)
-
-    return dsp_fscore, true_fscore
