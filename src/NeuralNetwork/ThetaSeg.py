@@ -1,46 +1,54 @@
-import numpy as np
+"""
+Created on Wed Apr 10 16:30:00 2024
 
+@author: GronlunE
+
+Purpose:
+
+Contains functions used to operate the thetaseg algorithm by orasanen https://github.com/orasanen/thetaOscillator.
+Evaluates syllable targets for the training data.
+"""
+
+
+import numpy as np
 from Miscellaneous import run_matlab_engine
 import pandas as pd
-import os.path
 import taglib
 from config import*
 
 
-def thetaSegTest(filepaths):
+def thetaSeg(filepaths):
     """
 
     :param filepaths:
     :return:
     """
     print("Commencing Theta Segmentation...")
+    eng = run_matlab_engine()
+    values = np.array(eng.thetaseg(filepaths))
+    filenames = []
+    sylls = []
 
-    if not os.path.isfile(theta_csv_save_loc):
+    print("Compiling filenames...")
+    for filepath in filepaths:
+        filename = filepath.split("\\")[-1].removesuffix(".wav")
+        filenames.append(filename)
 
-        eng = run_matlab_engine()
-        values = np.array(eng.thetaseg(filepaths))
-        filenames = []
-        sylls = []
+    print("Compiling syllables...")
+    for syllables in values:
+        syllables = int(syllables[0])
+        sylls.append(syllables)
 
-        print("Compiling filenames...")
-        for filepath in filepaths:
-            filename = filepath.split("\\")[-1].removesuffix(".wav")
-            filenames.append(filename)
+    print("Compiling Dataframe...")
+    thetaSyllDict = {"Filename": filenames, "Syllables": sylls}
+    thetaDF = pd.DataFrame(thetaSyllDict)
+    thetaDF.to_csv(theta_csv_save_loc, index=False)
 
-        print("Compiling syllables...")
-        for syllables in values:
-            syllables = int(syllables[0])
-            sylls.append(syllables)
 
-        print("Compiling Dataframe...")
-        thetaSyllDict = {"Filename": filenames, "Syllables": sylls}
-        thetaDF = pd.DataFrame(thetaSyllDict)
-        thetaDF.to_csv(theta_csv_save_loc, index=False)
+def baseline_preds():
 
-    else:
-
-        print("Compiling Dataframe...")
-        thetaDF = pd.read_csv(theta_csv_save_loc)
+    print("Compiling Dataframe...")
+    thetaDF = pd.read_csv(theta_csv_save_loc)
 
     print("Calculating MA error...")
     testDF = pd.read_csv(test_csv_loc)

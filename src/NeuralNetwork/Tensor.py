@@ -1,3 +1,13 @@
+"""
+Created on Wed Apr 10 16:30:00 2024
+
+@author: GronlunE
+
+Purpose:
+
+Functions used for building the tensors used to train the network.
+"""
+
 import glob
 import numpy as np
 from os import path

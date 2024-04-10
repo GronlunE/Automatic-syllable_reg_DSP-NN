@@ -1,39 +1,79 @@
-# Own implementation
+"""
+Created on Wed Apr 10 16:30:00 2024
+
+@author: GronlunE
+
+PURPOSE:
+This script serves as the user inter face for inputting commands to test the functionality of the neural network
+defined in models.py.
+
+COMMANDS:
+- config:
+The command allows to set number of epochs and/or batches for training and/or number of channels for the network.
+- langdep:
+The command tests the language dependency of the network by regulating the amount of languages in the training data.
+- datadep:
+The command tests the data dependency of the network by allowing to regulate the amount of data in the training data.
+- primary:
+The command trains the network with all available data.
+- crossval:
+Performs cross validation with the testing data (contains actual true targets instead of the DSP derived ones
+in the training data). The goal is to evaluate the model's generalization.
+- begin:
+Executes all listed testing commands.
+- end
+Immediately exits the program.
+"""
+
+import os.path
+
 import numpy as np
 from config import*
 from scipy.io import loadmat, savemat
-from DSP_NN import run_WaveNet, run_cross_validation, run_prediction, set_baseline
+from DSP_NN import train_NeuralNet, run_cross_validation, run_prediction, set_baseline
+# from Miscellaneous import data_table, csv_to_latex, get_filepaths
+# from ThetaSeg import thetaSeg
 
 
-def generate_user_commands():
+def interface():
     """
-    Asks the user for the tests
-    :return:
+    Function for user inputs.
+    :return: List of commands, epochs, batches, channels
     """
-    valid_commands = ["basic",
+    valid_commands = ["primary",
                       "langdep",
                       "datadep",
                       "crossval",
-                      "begin",
                       "demo",
                       "baseline",
-                      "langdep_full",
-                      "datadep_full",
-                      "config"]
+                      "config",
+                      "begin",
+                      "end"]
+    languageNames = ["Dutch", "English", "French", "German", "Italian", "Polish", "Portuguese", "Spanish"]
     commands = []
-    epochs = 100
-    dims = 32
+    epochs = 10
+    channels = 32
     batches = 32
-    print(f"Epochs: {epochs}\nDims: {dims}\nBatches: {batches}")
+    print(f"Epochs: {epochs}\nChannels: {channels}\nBatches: {batches}")
+    valid_commands_string = ", ".join(valid_commands)
+    print("Valid commands: ")
+    print(valid_commands_string)
     while True:
-        command = input(f"Enter command or type 'begin' to start execution: ")
+        command = input(f"Enter command or type 'begin' to start execution or 'end' to exit: ")
+
+        if command == "end":
+            commands = ["end"]
+            return commands, epochs, batches, channels
 
         if command == "begin":
-            print("Starting execution...")
-            break
+            if len(commands) == 0:
+                # Do something if commands is empty
+                print("Commands list is empty, input a testing command before beginning.")
+            else:
+                break
 
-        if command == "configure":
-            confs_legal = ["epochs", "dims", "batches"]
+        if command == "config":
+            confs_legal = ["epochs", "channels", "batches"]
 
             while True:
                 conf = input(f"Input one of {confs_legal} and an integer. Separate with space. If done type 'done':")
@@ -50,13 +90,13 @@ def generate_user_commands():
 
                             if split[0] == "epochs":
                                 epochs = split[1]
-                            elif split[0] == "dims":
-                                dims = split[1]
+                            elif split[0] == "channels":
+                                channels = split[1]
                             elif split[0] == "batches":
                                 batches = split[1]
 
                             print(f"Successfully set {split[0]} to {split[1]}")
-                            print(f"Epochs: {epochs}\nDims: {dims}\nBatches: {batches}")
+                            print(f"Epochs: {epochs}\nDims: {channels}\nBatches: {batches}")
                             continue
 
                 print("Invalid command.")
@@ -70,38 +110,13 @@ def generate_user_commands():
                 f"Added demo operation with commands "
                 f": {commands} to command list.")
 
-        if command == "langdep_full":
-            commands = ["langdep_full",
-                        ("langdep", ["french"]),
-                        ("langdep", ["polish"]),
-                        ("langdep", ["spanish"]),
-                        ("langdep", ["french", "polish"]),
-                        ("langdep", ["french", "spanish"]),
-                        ("langdep", ["polish", "spanish"]),
-                        ("langdep", ["french", "polish", "spanish"])]
-
-            print(
-                f"Added demo operation with commands "
-                f": {commands} to command list.")
-
-        if command == "datadep_full":
-            commands = ["datadep_full",
-                        ("datadep", "700"),
-                        ("datadep", "1425"),
-                        ("datadep", "2850"),
-                        ("datadep", "5700")]
-
-            print(
-                f"Added demo operation with commands "
-                f": {commands} to command list.")
-
         if command not in valid_commands:
             print("Invalid command.")
             continue
 
-        if command == "basic":
+        if command == "primary":
             commands.append(command)
-            print("Added basic operation to command list.")
+            print("Added the primary operation to command list.")
 
         elif command == "baseline":
             commands.append(command)
@@ -113,14 +128,14 @@ def generate_user_commands():
 
             while True:
 
-                lang = input("Enter language (estonian or english) or type 'done': ")
+                lang = input("Enter language (Estonian or English) or type 'done': ")
 
                 if lang == "done":
                     if not languages:
                         print("At least one language must be entered.")
                         continue
                     break
-                elif lang not in ["estonian", "english"]:
+                elif lang not in ["Estonian", "English"]:
                     print("Invalid language.")
                     continue
 
@@ -135,7 +150,7 @@ def generate_user_commands():
 
             while True:
 
-                lang = input("Enter language (french, spanish, polish, all) or type 'done': ")
+                lang = input(f"Enter language ({', '.join(languageNames)}) or type 'done': ")
 
                 if lang == "done":
                     if not languages:
@@ -143,9 +158,9 @@ def generate_user_commands():
                         continue
                     break
                 elif lang == "all":
-                    languages = ["french", "spanish", "polish"]
+                    languages = languageNames
                     break
-                elif lang not in ["french", "spanish", "polish"]:
+                elif lang not in languageNames:
                     print("Invalid language.")
                     continue
 
@@ -168,7 +183,7 @@ def generate_user_commands():
 
             print(f"Added data-dependence operation with {n_samples} samples per language to command list.")
 
-    return commands, epochs, batches, dims
+    return commands, epochs, batches, channels
 
 
 def main():
@@ -178,7 +193,7 @@ def main():
     """
 
     matlab_data = {}
-    commands, epochs, batches, dims = generate_user_commands()
+    commands, epochs, batches, dims = interface()
     new_tensor = []
     new_syllables = []
 
@@ -186,11 +201,16 @@ def main():
 
         cross_val_data = {}
         prediction_data = {}
+        baseline_score = {}
         history_dict = {}
         model = []
 # ----------------------------------------------EXECUTE COMMANDS--------------------------------------------------------
 
-        if command[0] == "crossval":
+        if commands[0] == "end":
+            print("Exiting...")
+            return
+
+        elif command[0] == "crossval":
 
             languages = command[1]
 
@@ -215,27 +235,64 @@ def main():
 
         else:
 
-            # load .mat file
-            data = loadmat(tensordata_loc)
+            # load .mat files
 
-            # extract variables from the .mat file
-            tensor = data['tensor']
-            syllables = data['syllables']
-            labels = np.transpose(data['labels']).flatten()
+            languageNames = ["Dutch", "English", "French", "German", "Italian", "Polish", "Portuguese", "Spanish"]
+            tensor = np.empty((0, 300, 12))
+            syllables = np.empty((0, 1))
+            labels = np.empty((0, 1))
 
-            N = tensor.shape[0]
+            for language in languageNames:
+
+                path = os.path.join(new_traindata_loc, language + ".mat")
+                data = loadmat(path)
+
+                # extract variables from the .mat file
+                tensor_tmp = data['tensor']
+                syllables_tmp = np.transpose(data['syllables'])
+                labels_tmp = np.full((10000, 1), language)
+
+                N = tensor_tmp.shape[0]
+
+                # Shuffle data
+                ord_ = np.arange(N)
+                np.random.shuffle(ord_)
+                tensor_tmp = tensor_tmp[ord_, :, :]
+                syllables_tmp = syllables_tmp[ord_]
+                labels_tmp = labels_tmp[ord_]
+
+                tensor = np.concatenate((tensor, tensor_tmp), axis=0)
+                syllables = np.concatenate((syllables, syllables_tmp), axis=0)
+                labels = np.concatenate((labels, labels_tmp), axis=0)
+
+            # Find the indices of the NaN values in the tensor
+            nan_indices = np.argwhere(np.isnan(tensor))
+
+            # Remove the NaN values from the tensor and update the label and syllable arrays
+            tensor = np.delete(tensor, nan_indices[:, 0], axis=0)
+            syllables = np.delete(syllables, nan_indices[:, 0], axis=0)
+            labels = np.delete(labels, nan_indices[:, 0], axis=0)
 
             # Shuffle data
+            N = tensor.shape[0]
             ord_ = np.arange(N)
             np.random.shuffle(ord_)
             tensor = tensor[ord_, :, :]
             syllables = syllables[ord_]
             labels = labels[ord_]
+            labels = labels[:,0]
 
-            if command == "basic":
+            """
+            tensor = tensor[0:1000, :, :]
+            syllables = syllables[0:1000]
+            labels = labels[0:1000]
+            """
+            del tensor_tmp, syllables_tmp, labels_tmp
+
+            if command == "primary":
 
                 # Running everything
-                print("Performing the basic test with all data...")
+                print("Performing the primary test with all data...")
                 new_tensor = tensor
                 new_syllables = syllables
                 pass
@@ -249,14 +306,19 @@ def main():
                     baseline_score[language] = {"MAE": mae, "MAPE": mape}
 
             elif command[0] == "langdep":
-
                 languages = command[1]
-
                 print(f"Performing language-dependence test for {len(languages)} "
                       f"languages: {', '.join(languages)}...")
 
                 # Divide tensor and syllables arrays into samples per language
-                samples_per_lang = 5700 // len(languages)
+                num_langs = len(languages)
+                if num_langs == 1:
+                    samples_per_lang = 5700
+                else:
+                    samples_per_lang = 5700 // 2  # default for two languages
+                    if num_langs == 3:
+                        samples_per_lang = 5700 // 3
+
                 tensor_lang = []
                 syllables_lang = []
                 for lang in languages:
@@ -278,8 +340,12 @@ def main():
                 new_tensor = []
                 new_syllables = []
 
-                for lang in ["french", "spanish", "polish"]:
+                labels = np.char.strip(labels)
 
+                for lang in languageNames:
+                    print(tensor.shape)
+                    print(labels.shape)
+                    print(lang)
                     lang_data = tensor[labels == lang]
                     lang_syllables = syllables[labels == lang]
 
@@ -298,8 +364,8 @@ def main():
             # Free space
             del data, tensor, syllables, labels
 
-            # Run Wavenet on new data
-            model, history = run_WaveNet(new_tensor, new_syllables, epochs=epochs, batch_size=batches, dims=dims)
+            # Run model on new data
+            model, history = train_NeuralNet(new_tensor, new_syllables, epochs=epochs, batch_size=batches, dims=dims)
 
             history_dict = {'Loss': history.history['loss'],
                             'MAE': history.history['mean_absolute_error'],
@@ -319,7 +385,6 @@ def main():
 
         elif command == "baseline":
 
-            baseline_score = {}
             matlab_data[f"Command_{commands.index(command) + 1}"] = {"Call": command,
                                                                      "Languages": baseline_score}
 
@@ -335,16 +400,23 @@ def main():
             matlab_data[f"Command_{commands.index(command) + 1}"] = {"Call": np.array(command, dtype=object),
                                                                      "History": history_dict,
                                                                      "Predictions": prediction_data}
+
             # Delete unnecessary variables
             del model
 
 # ---------------------------------------------SAVING THE DATA----------------------------------------------------------
 
-    if commands[0] == "langdep_full":
+    if commands[0] == "primary":
+        savemat(primary_resultmat_loc, matlab_data)
+
+    elif commands[0] == "langdep_full":
         savemat(langdep_resultmat_loc, matlab_data)
 
     elif commands[0] == "datadep_full":
         savemat(datadep_resultmat_loc, matlab_data)
+
+    elif commands[0][0] == "crossval":
+        savemat(crossval_resultmat_loc, matlab_data)
 
     else:
         savemat(resultmat_loc, matlab_data)

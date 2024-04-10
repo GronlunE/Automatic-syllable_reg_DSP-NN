@@ -1,44 +1,42 @@
-function plot_history(history_dict)
-%% Extract the history data
+function [] = plot_history(data)
+ 
+    % Set default font size and line width for figures
+    set(groot, 'DefaultAxesFontSize', 36, ...
+        'defaultAxesFontWeight','bold', ...
+        'DefaultLineLineWidth', 6);
 
-loss = history_dict.Loss;
-mae = history_dict.MAE;
-mape = history_dict.MAPE;
-val_loss = history_dict.Val_Loss;
-val_mae = history_dict.Val_MAE;
-val_mape = history_dict.Val_MAPE;
+    % Extract the data from the command
+    command_data = data.Command_1;
+    history_data = command_data.History;
 
-%% Plot the training and validation loss
+    % Plot Loss and Validation Loss
+    figure("Name", "primaryLOSS");
+    plot(history_data.Loss);
+    hold on;
+    plot(history_data.Val_Loss);
+    xlabel('Epoch', 'FontAngle', 'italic');
+    ylabel('Loss', 'FontAngle', 'italic');
+    legend('Loss', 'Validation Loss', 'Location', 'best');
 
-figure;
-subplot(3,1,1)
-plot(loss);
-hold on;
-plot(val_loss);
-legend('Training Loss', 'Validation Loss');
-xlabel('Epoch');
-ylabel('Loss');
-title('Training and Validation Loss');
+    % Plot MAE and Validation MAE
+    figure("Name", "primaryMAE");
+    plot(history_data.MAE);
+    hold on;
+    plot(history_data.Val_MAE);
+    xlabel('Epoch', 'FontAngle', 'italic');
+    ylabel('MAE', 'FontAngle', 'italic');
+    legend('MAE', 'Validation MAE', 'Location', 'best');
 
-%% Plot the training and validation MAE
+    % Plot MAPE and Validation MAPE
+    figure("Name","primaryMAPE");
+    plot(history_data.MAPE);
+    hold on;
+    plot(history_data.Val_MAPE);
+    xlabel('Epoch', 'FontAngle', 'italic');
+    ylabel('MAPE', 'FontAngle', 'italic');
+    legend('MAPE', 'Validation MAPE', 'Location', 'best');
 
-subplot(3,1,2)
-plot(mae);
-hold on;
-plot(val_mae);
-legend('Training MAE', 'Validation MAE');
-xlabel('Epoch');
-ylabel('MAE');
-title('Training and Validation MAE');
-
-%% Plot the training and validation MAPE
-
-subplot(3,1,3)
-plot(mape);
-hold on;
-plot(val_mape);
-legend('Training MAPE', 'Validation MAPE');
-xlabel('Epoch');
-ylabel('MAPE');
-title('Training and Validation MAPE');
+    % Reset font size and line width to default values
+    set(groot, 'DefaultAxesFontSize', 'remove', 'DefaultLineLineWidth', 'remove');
 end
+
